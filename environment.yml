@@ -1,0 +1,10 @@
+name: cvmatching
+dependencies:
+  - python=3.13.7
+  - pandas
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - pytorch
+  - streamlit
+  - flask
