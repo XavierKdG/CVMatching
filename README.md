@@ -30,3 +30,7 @@ Verwijder de `miniconda.sh` file
 
 `conda activate cvmatching`
 
+### 6. Installeer PyTorch
+
+`pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu`
+
