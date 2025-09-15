@@ -1,0 +1,5 @@
+# ignore Python environments
+.env
+.venv
+env/
+venv/
