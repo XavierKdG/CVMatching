@@ -3,3 +3,6 @@
 .venv
 env/
 venv/
+
+# ignore csv files
+*.csv 
