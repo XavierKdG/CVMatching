@@ -3,6 +3,7 @@ import numpy as np
 import re
 import nltk
 from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
 
 nltk.download('stopwords')
 
@@ -25,16 +26,24 @@ nltk.download('stopwords')
 # 1. Relevante kolommen -> Experience, job Descriptions?
 # 2. Kolommen schoonmaken Voornamelijk Job Description is Raw Text (Regex of andere type.)
 # ---------------------------
-# 4. Label maken ->  nieuwe kolom. --> Welke CV matched nou goed  
-stop_words_nltk = set(stopwords.words("english"))
+# 4. Label maken ->  nieuwe kolom. --> Welke CV matched nou goed
 
+# Download deze codes als je voor het eerst opstart graag.
+# nltk.download("stopwords")
+#nltk.download("wordnet")
+#nltk.download("omw-1.4")  
+############################################################################################################################################
+lemmatizer = WordNetLemmatizer()
+stop_words_nltk = set(stopwords.words("english"))
 COLUMNS_TO_CLEAN = ["job description", "minimum qual requirement", "preferred skills","residency requirement"]
+KEEP_SINGLE = {"a", "i"}
+
 
 """_summary_
 krijgt Raw text als Arg
 Return opgeschoonde tekst (zonder tekens etc..)
 """
-def clean_text(text):
+def clean_text(text : str ) -> str:
     # lowercase
     text = text.lower()
     # remove special chars -> keep only letters, numbers, spaces
@@ -42,7 +51,9 @@ def clean_text(text):
     # collapse multiple spaces
     text = re.sub(r'\s+', ' ', text).strip()
     # remove stopwords
-    words = [w for w in text.split() if w not in stop_words_nltk]
+    words = [lemmatizer.lemmatize(w) for w in text.split() if w not in COLUMNS_TO_CLEAN]
+    # remove single characters except 'a' and 'i'
+    words = [w for w in words if len(w) > 1 or w in KEEP_SINGLE]
     return " ".join(words)
 
 
