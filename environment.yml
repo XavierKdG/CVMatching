@@ -9,3 +9,4 @@ dependencies:
   - streamlit
   - flask
   - nltk
+  - word2vec
