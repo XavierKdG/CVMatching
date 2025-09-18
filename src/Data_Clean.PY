@@ -23,8 +23,7 @@ from nltk.corpus import stopwords
 # 1. Relevante kolommen -> Experience, job Descriptions?
 # 2. Kolommen schoonmaken Voornamelijk Job Description is Raw Text (Regex of andere type.)
 # ---------------------------
-# 4. Label maken ->  nieuwe kolom. --> Welke CV matched nou goed
-nltk.download("stopwords")  # only needed once
+# 4. Label maken ->  nieuwe kolom. --> Welke CV matched nou goed  
 stop_words_nltk = set(stopwords.words("english"))
 
 COLUMNS_TO_CLEAN = ["job description", "minimum qual requirement", "preferred skills","residency requirement"]
@@ -53,8 +52,8 @@ def regexs (df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-df = pd.read_csv("data/raw/job_descriptions.csv",sep=',')
-df2 = pd.read_csv("data/raw/job_descriptions2.csv",sep=',')
+df = pd.read_csv("./data/raw/job_descriptions.csv",sep=',')
+df2 = pd.read_csv("./data/raw/job_descriptions2.csv",sep=',')
 
 regexs(df2)
 #for col in df.columns:
