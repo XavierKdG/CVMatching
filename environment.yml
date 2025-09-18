@@ -8,3 +8,4 @@ dependencies:
   - pytorch
   - streamlit
   - flask
+  - nltk
