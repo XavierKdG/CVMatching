@@ -6,3 +6,6 @@ venv/
 
 # ignore csv files
 *.csv 
+
+# ignore model files
+*.pth

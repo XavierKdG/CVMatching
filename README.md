@@ -15,26 +15,39 @@ CVMatching is een project waarin wij met behulp van NLP, cv's automatisch analys
 
 ### 2. Datasets toevoegen
 
-Download de 2 datasets en voeg ze toe aan de folder 'data'
+Download de 2 datasets en voeg ze toe aan de folder `data/raw/`
 
-### 3. Miniconda installeren
-1. `curl -o miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh`
+### 3. Miniconda omgeving installeren
+1. Installeer Miniconda (en verwijder installatie bestand):
 
-2. `bash miniconda.sh`
+`curl -o miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh`
 
-3. `source ~/.bashrc`
+`bash miniconda.sh`
 
-### 4. Miniconda.sh verwijderen
-Verwijder de `miniconda.sh` file
+`source ~/.bashrc`
 
-### 5. Conda environment aanmaken
+`rm miniconda.sh` 
+
+2. Maak de Conda environment aan:
+
 `conda env create -f environment.yml`
 
-### 6. Environment activeren
+3. Activeer de environment:
 
 `conda activate cvmatching`
 
-### 7. Installeer PyTorch
+4. Installeer PyTorch (CPU-versie)
 
 `pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu`
 
+### 4. Preprocessing uitvoeren
+
+`python src/preprocess.py --input data/raw --output data/processed`
+
+### 5. Model trainen
+
+`python src/train.py --config configs/train_config.yml`
+
+### 6. Model evalueren
+
+`python src/evaluate.py --model_path models/yourmodel.pth --data_path data/processed`

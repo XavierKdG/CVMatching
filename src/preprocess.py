@@ -1,0 +1,26 @@
+import pandas as pd
+import os 
+import re
+
+os.makedirs('data/processed', exist_ok=True)
+os.makedirs('data/raw', exist_ok=True)
+
+def load_raw_csv(file_path):
+    return pd.read_csv(file_path)
+
+def clean_text(text):
+    text = re.sub(r'\s+', ' ', text)
+    return text
+
+def main():
+    df1 = load_raw_csv('../data/raw/job_descriptions1.csv')
+    df2 = load_raw_csv('../data/raw/job_descriptions2.csv')
+
+    df1['text'] = df1['text'].apply(clean_text)
+    df2['text'] = df2['text'].apply(clean_text)
+    
+    df1.to_csv('../data/processed/processed_df1.csv', index=False)
+    df2.to_csv('data/processed/processed_df2.csv', index=False)
+
+if __name__ == "__main__":
+    main()
