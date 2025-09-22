@@ -10,3 +10,4 @@ dependencies:
   - flask
   - nltk
   - word2vec
+  - spacy
