@@ -5,6 +5,8 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
+nltk.download('stopwords')
+
 ## Case omschrijving
 # Cv's kan rangschikken op basis van relevantie functie
 # 2 datasets -> Job description2  = Job Postings van bedrijven  /// Job description = Zijn de Cv's van de mensen 
