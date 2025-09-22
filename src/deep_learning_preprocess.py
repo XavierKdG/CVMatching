@@ -41,7 +41,7 @@ KEEP_SINGLE = {"a", "i"}
 krijgt Raw text als Arg
 Return opgeschoonde tekst (zonder tekens etc..)
 """
-def clean_text(text : str ) -> str:
+def clean_text2(text : str ) -> str:
     # lowercase
     text = text.lower()
     # remove special chars -> keep only letters, numbers, spaces
@@ -55,24 +55,25 @@ def clean_text(text : str ) -> str:
     return " ".join(words)
 
 
-def regexs (df: pd.DataFrame) -> pd.DataFrame:
+def regexs2 (df: pd.DataFrame) -> pd.DataFrame:
     for col in df.columns:
         if any(keyword in col.lower() for keyword in COLUMNS_TO_CLEAN):  # check column name
             print(f"Cleaning column: {col}")            
-            df[col] = df[col].astype(str).apply(lambda x: clean_text(x))
+            df[col] = df[col].astype(str).apply(lambda x: clean_text2(x))
     return df
 
 
 df = pd.read_csv("./data/raw/job_descriptions.csv",sep=',')
 df2 = pd.read_csv("./data/raw/job_descriptions2.csv",sep=',')
 
-regexs(df2)
 #for col in df.columns:
 #    print(f"{col}: {df[col].iloc[0]}")
+df2_cleaned = regexs2(df2)
+df2_cleaned.to_csv("./data/processed/job_descriptions2_cleaned.csv", index=False)
 
-print('\n \n \n')
-for col in df2.columns:
-    print(f"{col}: {df2[col].iloc[0]}")
+print("\n✅ Cleaning done! New file saved at './data/processed/job_descriptions2_cleaned.csv'")
+
+
 
 
 
