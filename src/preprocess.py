@@ -1,7 +1,7 @@
 import pandas as pd
 import os 
 import re
-from sklearn.model_selection import train_test_split
+
 
 os.makedirs('data/processed', exist_ok=True)
 os.makedirs('data/raw', exist_ok=True)
