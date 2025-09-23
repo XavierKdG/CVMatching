@@ -1,6 +1,7 @@
 import pandas as pd
 import os 
 import re
+from sklearn.model_selection import train_test_split
 
 os.makedirs('data/processed', exist_ok=True)
 os.makedirs('data/raw', exist_ok=True)
@@ -10,6 +11,8 @@ def load_raw_csv(file_path):
 
 def clean_text(text):
     text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9 ]', '', text)
+    text = text.lower().strip()
     return text
 
 def main():
