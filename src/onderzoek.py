@@ -1,18 +1,19 @@
 import pandas as pd
 
-# Load the similarity matrix you saved
-similarity_df = pd.read_csv("./data/processed/resume_job_similarity.csv", index_col=0)
+# Load CSV
+results_df = pd.read_csv("./data/processed/job_best_resume_match.csv")
 
-# Show first few rows
-print(similarity_df.head())
+# Find the best match for each Resume_Index
+best_per_resume = results_df.loc[results_df.groupby("Resume_Index")["Similarity"].idxmax()]
 
-# If you want to see which job each resume matches best:
-best_matches = similarity_df.idxmax(axis=1)   # column with highest similarity
-best_scores = similarity_df.max(axis=1)       # highest similarity value
+# Reset index for neatness
+best_per_resume = best_per_resume.reset_index(drop=True)
 
-results = pd.DataFrame({
-    "Best_Match_Job": best_matches,
-    "Best_Score": best_scores
-})
+# Save results if needed
+best_per_resume.to_csv("./data/processed/best_job_per_resume.csv", index=False)
 
-print(results.head())
+# Print results
+for _, row in best_per_resume.iterrows():
+    print(f"🧑 Resume {row['Resume_Index']} ({row['Resume_Category']})")
+    print(f"   👉 Best Job: {row['Job_Category']}")
+    print(f"   🔥 Similarity: {row['Similarity']:.4f}\n")
