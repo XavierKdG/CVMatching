@@ -15,10 +15,10 @@ dependencies:
   - flask
   - nltk
   - pip
+  - spacy-model-en_core_web_sm
   - pip:
     - spacy
     - word2vec
     - sentence-transformers
     - transformers
-    - en-core-web-sm
     - qdrant-client
