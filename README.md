@@ -46,6 +46,8 @@ Download de 2 datasets en voeg ze toe aan de folder `data/raw/`
 
 2. `docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant`
 
+3. `http://localhost:6333` voor de UI van Qdrant
+
 ### 5. Preprocessing uitvoeren
 
 `python src/preprocess.py --input data/raw --output data/processed`
