@@ -5,7 +5,8 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 import spacy
-from deep_learning_preprocess import clean_text2, regexs2
+from text_cleaning import TextCleaner
+
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -18,15 +19,18 @@ def extract_features(text: str) -> dict:
     noun_phrases = [chunk.text for chunk in doc.noun_chunks]
 
     return { 
-        "clean_text": clean_text2(text), 
+        "clean_text": regexs(text), 
         "pos_tags": pos_tags, 
         "entities": entities, 
         "noun_phrases": noun_phrases }
 
 
+
+cleaner = TextCleaner()
 df2 = pd.read_csv("./data/raw/job_descriptions2.csv",sep=',')
-regexs2(df2)
 df2_features = df2.copy()
+
+df_cleaned = cleaner.clean_dataframe(df2)
 
 df2_features["features"] = df2_features["Job Description"].apply(extract_features)
 
