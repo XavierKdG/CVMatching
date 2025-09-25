@@ -5,8 +5,14 @@ import html
 from sklearn.model_selection import train_test_split
 import nltk
 from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
 
-nltk.download('stopwords')
+# nltk.download('punkt_tab')      
+# nltk.download('wordnet')    
+# nltk.download('omw-1.4') 
+# nltk.download('averaged_perceptron_tagger_eng')
+# nltk.download('stopwords')
 
 os.makedirs('data/processed', exist_ok=True)
 os.makedirs('data/raw', exist_ok=True)
@@ -40,6 +46,12 @@ def clean_text(text):
     # 7. Remove English stopwords
     pattern = re.compile(r'\b(' + r'|'.join(stopwords.words('english')) + r')\b\s*')
     text = pattern.sub("", text)
+
+    # 8. Lemmatization
+    lemmatizer = WordNetLemmatizer()
+
+    lemmatized_text = " ".join([lemmatizer.lemmatize(word) for word in text.split()])
+    text = lemmatized_text
 
     return text
 
