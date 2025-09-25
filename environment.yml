@@ -17,7 +17,6 @@ dependencies:
   - pip
   - pip:
     - spacy
-    - word2vec
-    - torch
     - sentence-transformers
-    - transformers
+    - nltk
+    # - word2vec

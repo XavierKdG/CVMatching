@@ -3,6 +3,7 @@ import os
 import re
 import html
 from sklearn.model_selection import train_test_split
+import nltk
 from nltk.corpus import stopwords
 
 nltk.download('stopwords')
