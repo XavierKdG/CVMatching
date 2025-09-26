@@ -17,6 +17,7 @@ os.makedirs('data/raw', exist_ok=True)
 
 class TextPreprocessing:
     def __init__(self, model_name='all-MiniLM-L6-v2', lemmatization=True):
+        """Initialize the TextPreprocessing class with necessary NLP tools."""
         nltk.download('stopwords', quiet=True) #download once
         nltk.download('wordnet', quiet=True) #download once
 
