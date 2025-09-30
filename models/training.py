@@ -3,6 +3,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
 import joblib
 
+X = pd.read_csv("data/processed/tfidf_matrix.csv")
+y = pd.read_csv("data/processed/labeled_datatest.csv")["label"]
+
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
@@ -14,5 +17,5 @@ y_pred = model.predict(X_test)
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print(classification_report(y_test, y_pred))
 
-joblib.dump(model, "models/logreg_tfidf.pkl")
+joblib.dump(model, "models/tfidf.pkl")
 print("Model opgeslagen")
