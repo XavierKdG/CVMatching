@@ -16,10 +16,11 @@ os.makedirs('data/raw', exist_ok=True)
 # elongation, negation handling, spellchecker
 
 class TextPreprocessing:
-    def __init__(self, model_name='all-MiniLM-L6-v2', lemmatization=True):
+    def __init__(self, model_name='all-MiniLM-L6-v2', lemmatization=True, embed_model=True):
         """Initialize the TextPreprocessing class with necessary NLP tools."""
         nltk.download('stopwords', quiet=True) #download once
         nltk.download('wordnet', quiet=True) #download once
+        nltk.download('punkt_tab', quiet=True) #download once
 
         self.nlp = spacy.load("en_core_web_sm") #spacy model
         self.stop_words = set(stopwords.words('english')) #for now english stopwords only
@@ -30,39 +31,39 @@ class TextPreprocessing:
         else:
             self.processor = SnowballStemmer("english") #uses stemmer
 
-        self.bert_model = SentenceTransformer(model_name) #BERT model 
+        self.embed_model = embed_model
+        if self.embed_model:
+            self.bert_model = SentenceTransformer(model_name) #BERT model
 
     def clean_text(self, text):
         text = re.sub(r'\s+', ' ', str(text)) #remove extra spaces
         text = re.sub(r'[^a-zA-Z0-9 ]', '', text) #remove special characters
         text = text.lower().strip() #lowercase and strip
         return text
-    
-    def preprocess_dataframe(self, df, columns):
-        df_copy = df.drop_duplicates().copy() #remove duplicates
-        for col in columns:
-            if col in df_copy.columns:
-                df_copy[col] = self.preprocess_texts(df_copy[col])
-            else:
-                print(f"Column '{col}' does not exist in the dataset.")
-        return df_copy
-    
+
     def tokenize_and_stem(self, text):
-        doc = self.nlp(text)
-        tokens = [token.text for token in doc if token.text.lower() not in self.stop_words]
+        tokens = word_tokenize(text) 
+        tokens = [t for t in tokens if t.lower() not in self.stop_words and t.isalpha()] #stopwords removal and keep only alphabetic tokens
         
         if self.use_lemmatizer:
-            processed = [self.processor.lemmatize(token) for token in tokens]
+            print("Using lemmatization")
+            processed = [self.processor.lemmatize(t) for t in tokens] #lemmatization
         else:
-            processed = [self.processor.stem(token) for token in tokens]
+            print("Using stemming")
+            processed = [self.processor.stem(t) for t in tokens] #stemming
         return processed
-    
-    def preprocess_texts(self, texts):
-        return [self.tokenize_and_stem(self.clean_text(t)) for t in texts]
-    
-    def encode_texts(self, texts):
-        return self.bert_model.encode(texts, convert_to_tensor=True)
-    
+
+    def preprocess_dataframe(self, df, columns, embed_text=True):
+        df_copy = df.drop_duplicates().copy() #drop duplicates
+
+        df_copy["data"] = df_copy[columns].astype(str).agg(" ".join, axis=1) #merge columns into one string
+        df_copy["data"] = df_copy["data"].apply(self.clean_text) #clean text
+        df_copy["tokens"] = df_copy["data"].apply(self.tokenize_and_stem) #tokenize and stem/lemmatize
+
+        if self.embed_model and embed_text:
+            df_copy["embeddings"] = list(self.bert_model.encode(df_copy["data"].tolist())) #BERT embeddings
+
+        return df_copy[["data", "tokens"] + (["embeddings"] if self.embed_model and embed_text else [])]
 
 def load_raw_csv(file_path):
     return pd.read_csv(file_path)
@@ -71,19 +72,18 @@ def main():
     # df1 = pd.read_csv("./data/raw/job_descriptions.csv")
     df2 = pd.read_csv("./data/raw/job_descriptions2.csv")
 
-    preprocessor = TextPreprocessing()
+    preprocessor = TextPreprocessing(model_name='all-MiniLM-L6-v2', lemmatization=True)
+    print("preprocessor initialized")
 
     # # preproccessing df1
-    # df1_columns_to_process = ['Job Description', 'Skills', 'Experience', 'Responsibilities']
-    # df1_processed = preprocessor.preprocess_dataframe(df1, df1_columns_to_process)
-    # df1_processed.to_csv('./data/processed/processed_df1.csv', index=False)
+    # df1_cols = ['Job Description', 'Skills', 'Experience', 'Responsibilities']
+    # df1_processed = preprocessor.preprocess_dataframe(df1, df1_cols)
+    # df1_processed[["data", "tokens"]].to_csv('./data/processed/df1_processed.csv', index=False)
 
     # preproccessing df2
-    df2_columns_to_process = ['Job Description', 'Preferred Skills']
-    df2_processed = preprocessor.preprocess_dataframe(df2, df2_columns_to_process)
-    df2_processed.to_csv('./data/processed/processed_df2.csv', index=False)
+    df2_cols = ['Job Description', 'Preferred Skills'] #columns to be merged and processed
+    df2_processed = preprocessor.preprocess_dataframe(df2, df2_cols) 
+    df2_processed[["data", "tokens"]].to_csv('./data/processed/df2_processed.csv', index=False)
 
 if __name__ == "__main__":
     main()
-
-
