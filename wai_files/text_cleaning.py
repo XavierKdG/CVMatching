@@ -4,7 +4,6 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
-
 class TextCleaner:
     """ A class to clean job description text data.
         Includes methods to clean text, clean DataFrame columns,""" 
@@ -13,16 +12,18 @@ class TextCleaner:
         nltk.download("stopwords", quiet=True)
         self.lemmatizer = WordNetLemmatizer()
         self.stop_words = set(stopwords.words("english"))
-        self.columns_to_clean = columns_to_clean or [
-            "job description",
-            "minimum qual requirement",
-            "preferred skills",
-            "residency requirement",
-        ]
+        self.columns_to_clean = [c.lower().strip() for c in (
+            columns_to_clean or [
+                "job description",
+                "minimum qual requirement",
+                "preferred skills",
+            ]
+        )]
         self.keep_single = keep_single or {"a", "i"}
 
     def regexs(self, text: str) -> str:
-        """Cleans a single text string using regex: lowercases, removes special characters,
+        """Cleans a single text string using regex: lowercases, removes special characters, using regex.
+        it's a helper function for clean_column.
         input = text string
         output = cleaned text string"""
 
@@ -79,7 +80,7 @@ def main():
     cleaner = TextCleaner()
     df_cleaned = cleaner.process_file(
         input_path="./data/raw/job_descriptions.csv",
-        output_path="./data/processed/job_descriptions_cleaned.csv",
+        output_path="./data/processed/job_descriptions_cleaned2.csv",
         sep=','
     )
     return df_cleaned

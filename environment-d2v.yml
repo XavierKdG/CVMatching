@@ -1,0 +1,23 @@
+name: d2v
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.12
+  - ipykernel
+  - gensim
+  - nltk
+  - pandas
+  - numpy
+  - requests
+  - PyPDF2
+  - pip
+  - scipy=1.12
+  - termcolor
+  - plotly
+  - pytorch=2.3
+  - nbformat
+  - matplotlib
+  - seaborn
+  - scikit-learn
