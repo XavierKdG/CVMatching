@@ -18,8 +18,8 @@ dependencies:
   - spacy-model-en_core_web_sm
   - pip:
     - spacy
-    - word2vec
-    - torch
+    # - word2vec
     - sentence-transformers
     - transformers
     - qdrant-client
+    - nltk
