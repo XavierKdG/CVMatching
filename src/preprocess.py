@@ -7,16 +7,10 @@ from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-from sentence_transformers import SentenceTransformer
-
-os.makedirs('data/processed', exist_ok=True)
-os.makedirs('data/raw', exist_ok=True)
-
-# Nog toe te voegen misschien:
-# elongation, negation handling, spellchecker
+import argparse
 
 class TextPreprocessing:
-    def __init__(self, model_name='all-MiniLM-L6-v2', lemmatization=True, embed_model=True):
+    def __init__(self, lemmatization=True):
         """Initialize the TextPreprocessing class with necessary NLP tools."""
         nltk.download('stopwords', quiet=True) #download once
         nltk.download('wordnet', quiet=True) #download once
@@ -31,13 +25,10 @@ class TextPreprocessing:
         else:
             self.processor = SnowballStemmer("english") #uses stemmer
 
-        self.embed_model = embed_model
-        if self.embed_model:
-            self.bert_model = SentenceTransformer(model_name) #BERT model
-
     def clean_text(self, text):
         text = re.sub(r'\s+', ' ', str(text)) #remove extra spaces
         text = re.sub(r'[^a-zA-Z0-9 ]', '', text) #remove special characters
+        text = re.sub(r'(.)\1{2,}', r'\1\1', text) #remove character repetitions
         text = text.lower().strip() #lowercase and strip
         return text
 
@@ -46,44 +37,57 @@ class TextPreprocessing:
         tokens = [t for t in tokens if t.lower() not in self.stop_words and t.isalpha()] #stopwords removal and keep only alphabetic tokens
         
         if self.use_lemmatizer:
-            print("Using lemmatization")
             processed = [self.processor.lemmatize(t) for t in tokens] #lemmatization
         else:
-            print("Using stemming")
             processed = [self.processor.stem(t) for t in tokens] #stemming
         return processed
 
-    def preprocess_dataframe(self, df, columns, embed_text=True):
-        df_copy = df.drop_duplicates().copy() #drop duplicates
+    def preprocess_dataframe(self, df, columns):
+        print(f"Starting preprocessing dataframe with {len(df)} rows and columns: {columns}")
+        df_copy = df.copy()
+
+        if 'Job ID' in df.columns: 
+            df_copy = df.drop_duplicates(subset=['Job ID']).copy() 
+
+        else: df_copy = df.drop_duplicates().copy()
+
+        print(f"Dropped {len(df) - len(df_copy)} duplicates\n")
 
         df_copy["data"] = df_copy[columns].astype(str).agg(" ".join, axis=1) #merge columns into one string
+        print("Merged columns")
+
         df_copy["data"] = df_copy["data"].apply(self.clean_text) #clean text
+        print("Cleaned text")
+
         df_copy["tokens"] = df_copy["data"].apply(self.tokenize_and_stem) #tokenize and stem/lemmatize
+        print("Tokenization + lemmatization/stemming done\n")
 
-        if self.embed_model and embed_text:
-            df_copy["embeddings"] = list(self.bert_model.encode(df_copy["data"].tolist())) #BERT embeddings
+        df_copy.drop(['data'], axis=1, inplace=True) #drop intermediate column
 
-        return df_copy[["data", "tokens"] + (["embeddings"] if self.embed_model and embed_text else [])]
-
-def load_raw_csv(file_path):
-    return pd.read_csv(file_path)
-
+        return df_copy
+    
 def main():
-    # df1 = pd.read_csv("./data/raw/job_descriptions.csv")
-    df2 = pd.read_csv("./data/raw/job_descriptions2.csv")
+    os.makedirs('data/processed', exist_ok=True)
+    os.makedirs('data/raw', exist_ok=True)
 
-    preprocessor = TextPreprocessing(model_name='all-MiniLM-L6-v2', lemmatization=True)
-    print("preprocessor initialized")
+    parser = argparse.ArgumentParser(description="Preprocess CSV datasets") #command line arguments
+    parser.add_argument('--input', type=str, default='data/raw', help="Input folder path") #input folder path
+    parser.add_argument('--output', type=str, default='data/processed', help="Output folder path") #output folder path
+    args = parser.parse_args()
 
-    # # preproccessing df1
-    # df1_cols = ['Job Description', 'Skills', 'Experience', 'Responsibilities']
-    # df1_processed = preprocessor.preprocess_dataframe(df1, df1_cols)
-    # df1_processed[["data", "tokens"]].to_csv('./data/processed/df1_processed.csv', index=False)
+    input_dir = args.input
+    output_dir = args.output
+    
+    input_file = os.path.join(input_dir, "job_descriptions2.csv") #input file path
+    df = pd.read_csv(input_file)
 
-    # preproccessing df2
-    df2_cols = ['Job Description', 'Preferred Skills'] #columns to be merged and processed
-    df2_processed = preprocessor.preprocess_dataframe(df2, df2_cols) 
-    df2_processed[["data", "tokens"]].to_csv('./data/processed/df2_processed.csv', index=False)
+    preprocessor = TextPreprocessing(lemmatization=True) 
+    columns_to_process = ['Job Description', 'Preferred Skills', 'Work Location 1'] #columns to merge and process
+    processed_df = preprocessor.preprocess_dataframe(df, columns_to_process)
+
+    output_file = os.path.join(output_dir, "job_descriptions_processed.csv")
+    processed_df.to_csv(output_file, index=False)
+    print(f"Saved processed file to {output_file}")
 
 if __name__ == "__main__":
     main()
