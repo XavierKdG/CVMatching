@@ -9,6 +9,7 @@ venv/
 
 # ignore model files
 *.pth
+models/
 
 # ignore Jupyter Notebook files
 *.ipynb

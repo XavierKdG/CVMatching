@@ -29,12 +29,12 @@ class TextPreprocessing:
         text = re.sub(r'\s+', ' ', str(text)) #remove extra spaces
         text = re.sub(r'[^a-zA-Z0-9 ]', '', text) #remove special characters
         text = re.sub(r'(.)\1{2,}', r'\1\1', text) #remove character repetitions
-        text = text.lower().strip() #lowercase and strip
+        text = text.strip() #lowercase and strip
         return text
 
     def tokenize_and_stem(self, text):
         tokens = word_tokenize(text) 
-        tokens = [t for t in tokens if t.lower() not in self.stop_words and t.isalpha()] #stopwords removal and keep only alphabetic tokens
+        tokens = [t for t in tokens if t not in self.stop_words and t.isalpha()] #stopwords removal and keep only alphabetic tokens
         
         if self.use_lemmatizer:
             processed = [self.processor.lemmatize(t) for t in tokens] #lemmatization
