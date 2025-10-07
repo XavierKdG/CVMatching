@@ -10,3 +10,5 @@ dependencies:
   - flask
   - rapidfuzz
   - gensim
+  - spacy
+  - text-preprocessor
