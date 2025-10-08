@@ -1,4 +1,3 @@
-# src/upload_to_qdrant.py
 import pandas as pd
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -13,7 +12,7 @@ df['tokens'] = df['tokens'].apply(ast.literal_eval)
 
 vectors = df['embeddings'].apply(ast.literal_eval) if isinstance(df['embeddings'][0], str) else df['embeddings'].tolist()
 ids = df.index.tolist()
-payload = df[['Job Category', 'Job ID']].to_dict(orient='records')
+payload = df[['Job Category', 'Job ID', 'Business Title']].to_dict(orient='records')
 
 client = QdrantClient(url=QDRANT_URL)
 embedding_dim = len(vectors[0])

@@ -82,7 +82,7 @@ def main():
     df = pd.read_csv(input_file)
 
     preprocessor = TextPreprocessing(lemmatization=True) 
-    columns_to_process = ['Job Description', 'Preferred Skills', 'Work Location 1'] #columns to merge and process
+    columns_to_process = ['Job Description', 'Preferred Skills', 'Work Location 1', 'Business Title'] #columns to merge and process
     processed_df = preprocessor.preprocess_dataframe(df, columns_to_process)
 
     output_file = os.path.join(output_dir, "job_descriptions_processed.csv")

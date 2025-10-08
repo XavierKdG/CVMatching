@@ -3,18 +3,18 @@ import argparse
 import pandas as pd
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from preprocess import TextPreprocessing
-import pyyaml 
+import yaml 
 import numpy as np
 import random
 
 class Doc2VecTrainer:
-    def __init__(self, vector_size=50, window=5, min_count=5, epochs=100, alpha=0.001, seed=42):
-        self.vector_size = vector_size
-        self.window = window
-        self.min_count = min_count
-        self.epochs = epochs
-        self.alpha = alpha
-        self.seed = seed
+    def __init__(self, config):
+        self.vector_size = config.get("vector_size", 50)
+        self.window = config.get("window", 5)
+        self.min_count = config.get("min_count", 5)
+        self.epochs = config.get("epochs", 100)
+        self.alpha = config.get("alpha", 0.001)
+        self.seed = config.get("seed", 42)
         self.model = None
 
         random.seed(self.seed)
@@ -44,27 +44,32 @@ class Doc2VecTrainer:
 
 def main():
     parser = argparse.ArgumentParser(description="Train Doc2Vec model on job descriptions")
-    parser.add_argument('--input', type=str, default='data/processed', help="Processed data folder")
-    parser.add_argument('--output', type=str, default='models', help="Output folder for model")
-    parser.add_argument('--vector_size', type=int, default=50)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--config', type=str, default='configs/train_config.yml', help="Path to YAML config file")
     args = parser.parse_args()
 
-    os.makedirs(args.output, exist_ok=True)
+    with open(args.config, "r") as file:
+        config = yaml.safe_load(file)
 
-    # Load processed data
-    df = pd.read_csv(os.path.join(args.input, "job_descriptions_processed.csv"))
-    
-    # Ensure 'tokens' column is list type
+    input_folder = config.get("input_folder", "data/processed")
+    output_folder = config.get("output_folder", "models")
+    os.makedirs(input_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
+
+    df = pd.read_csv(os.path.join(input_folder, "job_descriptions_processed.csv"))
     df['tokens'] = df['tokens'].apply(eval)
 
-    trainer = Doc2VecTrainer(vector_size=args.vector_size, epochs=args.epochs)
+    trainer = Doc2VecTrainer(config)
     tagged_data = trainer.tag_data(df)
     trainer.train_model(tagged_data)
 
-    model_path = os.path.join(args.output, "cv_job_matching.model")
+    model_path = os.path.join(output_folder, "cv_job_matching.model")
     trainer.save_model(model_path)
 
+    embeddings = [trainer.model.dv[str(i)].tolist() for i in range(len(df))]
+    df['embeddings'] = embeddings
+    embedding_csv_path = os.path.join(input_folder, "job_descriptions_embeddings.csv")
+    df.to_csv(embedding_csv_path, index=False)
+    print(f"Embeddings saved to {embedding_csv_path}")
 
 if __name__ == "__main__":
     main()
