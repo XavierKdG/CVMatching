@@ -7,6 +7,10 @@ venv/
 # ignore csv files
 *.csv 
 
+# ignore Python cache files
+__pycache__/
+*.pyc
+
 # ignore model files
 *.pth
 models/
