@@ -14,7 +14,7 @@ def extract_text_from_pdf(uploaded_file):
         text += page.extract_text() or ""
     return text
 
-st.title("CV Matching UI")
+st.title("CV Matching")
 
 #upload stuk voor cv
 uploaded_cv = st.file_uploader("Upload je CV (PDF)", type=["pdf"])
@@ -24,20 +24,20 @@ job_choice = st.selectbox("Kies een vacature", df_jobs["Job Title"])
 
 if st.button("Check match"):
     if uploaded_cv is None:
-        st.warning("⚠️ Upload eerst een PDF van je CV.")
+        st.warning("Upload eerst een PDF van je CV.")
     else:
         cv_text = extract_text_from_pdf(uploaded_cv)
-        # Haal skills van gekozen vacature
+        #skills van de vacature
         job_row = df_jobs[df_jobs["Job Title"] == job_choice].iloc[0]
         job_title = job_row["Job Title"]
         job_skills = job_row["skills"]
 
-        # Gebruik je bestaande hybride functie
+        #geimporteerde functie gebruiken
         label = hybrid_label(cv_text, job_title, job_skills)
 
-        # Toon resultaat
+        #resultaat
         if label == 1:
-            st.success("✅ Match gevonden!")
+            st.success("Match gevonden!")
         else:
-            st.error("❌ Geen match.")
+            st.error("Geen match.")
 
