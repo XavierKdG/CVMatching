@@ -3,6 +3,7 @@ import argparse
 import pandas as pd
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from preprocess import TextPreprocessing
+import pyyaml 
 import numpy as np
 import random
 
