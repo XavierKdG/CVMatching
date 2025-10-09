@@ -78,16 +78,25 @@ def main():
     input_dir = args.input
     output_dir = args.output
     
-    input_file = os.path.join(input_dir, "job_descriptions2.csv") #input file path
-    df = pd.read_csv(input_file)
-
     preprocessor = TextPreprocessing(lemmatization=True) 
-    columns_to_process = ['Job Description', 'Preferred Skills', 'Work Location 1', 'Business Title'] #columns to merge and process
-    processed_df = preprocessor.preprocess_dataframe(df, columns_to_process)
 
+    #Job descriptions
+    input_jobs = os.path.join(input_dir, "job_descriptions2.csv") #input file path
+    df_jobs = pd.read_csv(input_jobs)
+    columns_to_process = ['Job Description', 'Preferred Skills', 'Work Location 1', 'Business Title'] #columns to merge and process
+    processed_jobs_df = preprocessor.preprocess_dataframe(df_jobs, columns_to_process)
     output_file = os.path.join(output_dir, "job_descriptions_processed.csv")
-    processed_df.to_csv(output_file, index=False)
-    print(f"Saved processed file to {output_file}")
+    processed_jobs_df.to_csv(output_file, index=False)
+    print(f"Saved processed Job Descriptions file to {output_file}")
+
+    #Resumes
+    input_resumes = os.path.join(input_dir, "Resume.csv") #input file path
+    df_resumes = pd.read_csv(input_resumes)
+    columns_to_process = ['Resume_str', 'Category'] #columns to merge and process
+    processed_resumes_df = preprocessor.preprocess_dataframe(df_resumes, columns_to_process)
+    output_file = os.path.join(output_dir, "resumes_processed.csv")
+    processed_resumes_df.to_csv(output_file, index=False)
+    print(f"Saved processed Resumes file to {output_file}")
 
 if __name__ == "__main__":
     main()

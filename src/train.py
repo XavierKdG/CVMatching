@@ -20,8 +20,8 @@ class Doc2VecTrainer:
         random.seed(self.seed)
         np.random.seed(self.seed)
 
-    def tag_data(self, df):
-        tagged_data = [TaggedDocument(words=row['tokens'], tags=[str(i)]) for i, row in df.iterrows()]
+    def tag_data(self, df, prefix=''):
+        tagged_data = [TaggedDocument(words=row['tokens'], tags=[f"{prefix}_{i}"]) for i, row in df.iterrows()]
         return tagged_data
 
     def train_model(self, tagged_data):
@@ -55,21 +55,40 @@ def main():
     os.makedirs(input_folder, exist_ok=True)
     os.makedirs(output_folder, exist_ok=True)
 
-    df = pd.read_csv(os.path.join(input_folder, "job_descriptions_processed.csv"))
-    df['tokens'] = df['tokens'].apply(eval)
+    jobs_path = os.path.join(input_folder, "job_descriptions_processed.csv")
+    resumes_path = os.path.join(input_folder, "resumes_processed.csv")
+
+    jobs_df = pd.read_csv(jobs_path)
+    resumes_df = pd.read_csv(resumes_path)
+
+    jobs_df['tokens'] = jobs_df['tokens'].apply(eval)
+    resumes_df['tokens'] = resumes_df['tokens'].apply(eval)
 
     trainer = Doc2VecTrainer(config)
-    tagged_data = trainer.tag_data(df)
+
+    job_tagged = trainer.tag_data(jobs_df, "job")
+    resume_tagged = trainer.tag_data(resumes_df, "cv")
+    tagged_data = job_tagged + resume_tagged
+
     trainer.train_model(tagged_data)
 
     model_path = os.path.join(output_folder, "cv_job_matching.model")
     trainer.save_model(model_path)
 
-    embeddings = [trainer.model.dv[str(i)].tolist() for i in range(len(df))]
-    df['embeddings'] = embeddings
-    embedding_csv_path = os.path.join(input_folder, "job_descriptions_embeddings.csv")
-    df.to_csv(embedding_csv_path, index=False)
-    print(f"Embeddings saved to {embedding_csv_path}")
+    job_embeddings = [trainer.model.dv[f"job_{i}"].tolist() for i in range(len(jobs_df))]
+    jobs_df['embeddings'] = job_embeddings
+
+    resume_embeddings = [trainer.model.dv[f"cv_{i}"].tolist() for i in range(len(resumes_df))]
+    resumes_df['embeddings'] = resume_embeddings
+
+    jobs_embedding_csv_path = os.path.join(input_folder, "job_descriptions_embeddings.csv")
+    resume_embedding_csv_path = os.path.join(input_folder, "resumes_embeddings.csv")
+
+    jobs_df.to_csv(jobs_embedding_csv_path, index=False)
+    print(f"Embeddings saved to {jobs_embedding_csv_path}")
+
+    resumes_df.to_csv(resume_embedding_csv_path, index=False)
+    print(f"Embeddings saved to {resume_embedding_csv_path}")
 
 if __name__ == "__main__":
     main()
