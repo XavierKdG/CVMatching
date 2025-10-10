@@ -11,14 +11,14 @@ def extract_text_from_pdf(uploaded_file):
     #haalt tekst uit een geüploade PDF
     reader = PyPDF2.PdfReader(uploaded_file)
     text = ""
-    for page in reader.pages:
+    for page in reader.pages:   
         text += page.extract_text() or ""
     return text
 
 st.title("CV Matching")
 
 #upload stuk voor cv
-uploaded_cv = st.file_uploader("Upload je CV (PDF)", type=["pdf"])
+uploaded_cv = st.file_uploader("Upload je CV (als PDF)", type=["pdf"])
 
 #vacature kiezen
 job_choice = st.selectbox("Kies een vacature", df_jobs["Job Title"])
@@ -33,12 +33,12 @@ if st.button("Check CV match"):
         job_title = job_row["Job Title"]
         job_skills = job_row["skills"]
 
-        #geimporteerde functie gebruiken
+        #geimporteerde functie gebruiken 
         label = hybrid_label(cv_text, job_title, job_skills)
 
         #resultaat
         if label == 1:
-            st.success("Match gevonden")
+            st.success("Match tussen CV en vacature gevonden")
         else:
             st.error("Geen match gevonden")
 
