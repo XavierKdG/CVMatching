@@ -5,6 +5,7 @@ from testcvmatching import hybrid_label #functie uit andere bestand importeren
 
 #vacatures laden
 df_jobs = pd.read_csv("../data/raw/job_descriptions.csv")
+df_jobs2 = pd.read_csv("../data/raw/job_descriptions2.csv")
 
 def extract_text_from_pdf(uploaded_file):
     #haalt tekst uit een geüploade PDF
