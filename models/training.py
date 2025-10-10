@@ -4,8 +4,8 @@ from sklearn.metrics import classification_report, accuracy_score
 import pandas as pd
 import joblib
 
-X = pd.read_csv("data/processed/tfidf_matrix.csv")
-y = pd.read_csv("data/processed/labeled_datatest.csv")["label"]
+X = pd.read_csv("..data/processed/tfidf_matrix.csv")
+y = pd.read_csv("..data/processed/labeled_datatest.csv")["label"]
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
