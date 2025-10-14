@@ -29,9 +29,9 @@ class TextPreprocessing:
         text = re.sub(r'\s+', ' ', str(text)) #remove extra spaces
         text = re.sub(r'[^a-zA-Z0-9 ]', '', text) #remove special characters
         text = re.sub(r'(.)\1{2,}', r'\1\1', text) #remove character repetitions
-        text = text.strip() #lowercase and strip
-        return text
-
+        text = re.sub(r'https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*', '', text) #remove links (https://stackoverflow.com/questions/21932615/regular-expression-for-remove-link)
+        return text.strip() #remove leading/trailing spaces
+ 
     def tokenize_and_stem(self, text):
         tokens = word_tokenize(text) 
         tokens = [t for t in tokens if t not in self.stop_words and t.isalpha()] #stopwords removal and keep only alphabetic tokens

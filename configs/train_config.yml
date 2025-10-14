@@ -1,8 +1,4 @@
-model_dir: models
-model_name: cv_job
-pretrained_model: all-MiniLM-L6-v2
-
-epochs: 100
+epochs: 1000
 alpha: 0.001
 vector_size: 384
 window: 5

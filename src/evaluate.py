@@ -11,7 +11,6 @@ from sklearn.preprocessing import normalize
 
 class ResumeEvaluator:
     def __init__(self, model_path):
-        print(f"Loading model from {model_path}...")
         self.model = Doc2Vec.load(model_path)
         self.preprocessor = TextPreprocessing(lemmatization=True)
 
@@ -53,10 +52,27 @@ def main():
 
     evaluator = ResumeEvaluator(args.model_path)
 
-    jobs_vectors = normalize(jobs_vectors)
-    resumes_vectors = normalize(resumes_vectors)
+    jobs_vectors = []
+    for i in range(len(jobs_df)):
+        tag = f"job_{i}"
+        if tag in evaluator.model.dv:
+            jobs_vectors.append(evaluator.model.dv[tag])
+        else:
+            raise KeyError(f"Tag {tag} not found in model.dv")
+    jobs_vectors = normalize(np.stack(jobs_vectors))
 
-    similarity_matrix = cosine_similarity(resumes_vectors, jobs_vectors) * 100
+    resumes_vectors = []
+    for i in range(len(resumes_df)):
+        tag = f"cv_{i}"
+        if tag in evaluator.model.dv:
+            resumes_vectors.append(evaluator.model.dv[tag])
+        else:
+            raise KeyError(f"Tag {tag} not found in model.dv")
+    resumes_vectors = normalize(np.stack(resumes_vectors))
+
+    similarity_matrix = cosine_similarity(resumes_vectors, jobs_vectors)
+    similarity_matrix = ((similarity_matrix + 1) / 2) * 100
+
 
     results = []
     for i, resume_row in resumes_df.iterrows():

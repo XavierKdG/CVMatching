@@ -71,7 +71,7 @@ def main():
     tagged_data = job_tagged + resume_tagged
 
     trainer.train_model(tagged_data)
-
+ 
     model_path = os.path.join(output_folder, "cv_job_matching.model")
     trainer.save_model(model_path)
 
