@@ -9,7 +9,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import argparse
 import logging
-import yaml
+from utils import setup_logging, load_config #help functions
 
 class TextPreprocessing:
     def __init__(self, use_lemmatization=True, use_ner=False):
@@ -87,22 +87,6 @@ class TextPreprocessing:
             logging.info("NER extraction completed.")
 
         return df_copy.drop(columns=['combined_text', 'cleaned_text']) #drop intermediate columns
-    
-def setup_logging():
-    """Configure logging to write to a file."""
-    os.makedirs('logs', exist_ok=True)
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        filename='logs/preprocessing.log',
-        filemode='w')
-    
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
-    logging.info("Logging is configured.")
 
 def parse_arguments(config):
     """Parse command-line arguments to override the config."""
@@ -112,12 +96,6 @@ def parse_arguments(config):
     args = parser.parse_args()
     logging.info(f"Arguments parsed: {args}")
     return args
-    
-def load_config(config_path="configs/config.yml"):
-    """Load configuration from a YAML file."""
-    logging.info(f"Loading configuration from: {config_path}")
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
     
 def process_file(preprocessor, config_section, raw_dir, processed_dir):
     """Process a single CSV file based on the configuration."""
@@ -143,8 +121,8 @@ def main():
     config = load_config() #load config
     args = parse_arguments(config) #parse command line arguments
 
-    os.makedirs('data/processed', exist_ok=True)
-    os.makedirs('data/raw', exist_ok=True)
+    os.makedirs(config['data']['raw_folder'], exist_ok=True)
+    os.makedirs(config['data']['processed_folder'], exist_ok=True)
 
     preprocessor = TextPreprocessing(
         use_lemmatization=config['preprocessing']['use_lemmatization'], #initialize preprocessor
