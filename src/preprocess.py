@@ -12,7 +12,7 @@ import logging
 import yaml
 
 class TextPreprocessing:
-    def __init__(self, lemmatization=True):
+    def __init__(self, use_lemmatization=True, use_ner=False):
         """Initialize the TextPreprocessing class with necessary NLP tools."""
         logging.info("Initialiseren van TextPreprocessor...")
         nltk.download('stopwords', quiet=True) #download once
@@ -22,10 +22,15 @@ class TextPreprocessing:
         self.nlp = spacy.load("en_core_web_sm") #spacy model
         self.stop_words = set(stopwords.words('english')) #for now english stopwords only
 
-        self.use_lemmatizer = lemmatization
-        self.processor = WordNetLemmatizer() if lemmatization else SnowballStemmer("english") #choose lemmatizer or stemmer
-        processor_type = "Lemmatizer" if lemmatization else "Stemmer" #for logging
+        self.use_lemmatizer = use_lemmatization
+        self.processor = WordNetLemmatizer() if use_lemmatization else SnowballStemmer("english") #choose lemmatizer or stemmer
+
+        self.use_ner = use_ner #use NER
+
+        processor_type = "Lemmatizer" if use_lemmatization else "Stemmer" #for logging
         logging.info(f"Preprocessor initialized with {processor_type}.") 
+        if self.use_ner:
+            logging.info("Named Entity Recognition (NER) ENABLED.")
 
     def clean_text(self, text):
         """Clean the input text by removing unwanted characters and formatting."""
@@ -34,7 +39,21 @@ class TextPreprocessing:
         text = re.sub(r'(.)\1{2,}', r'\1\1', text) #remove character repetitions
         text = re.sub(r'http\S+|www\.\S+', '', text) #remove http & www URLs (used AI for this regex)
         return text.strip() #remove leading/trailing spaces
- 
+    
+    def extract_entities(self, text):
+        """Extract name entities from text using spaCy (NER)"""
+        doc = self.nlp(text)
+        entities = {}
+        for ent in doc.ents:
+            if ent.label_ not in entities:
+                entities[ent.label_] = []
+            entities[ent.label_].append(ent.text)
+        
+        for label, items in entities.items():
+            entities[label] = list(set(items))
+
+        return entities
+
     def tokenize_and_process(self, text):
         """Tokenize the text and apply stemming or lemmatization."""
         tokens = word_tokenize(text) 
@@ -61,6 +80,11 @@ class TextPreprocessing:
         df_copy["combined_text"] = df_copy[columns_to_combine].astype(str).agg(" ".join, axis=1) #merge columns into one string
         df_copy["cleaned_text"] = df_copy["combined_text"].apply(self.clean_text) #clean text
         df_copy["tokens"] = df_copy["cleaned_text"].apply(self.tokenize_and_process) #tokenize and stem/lemmatize
+
+        if self.use_ner:
+            logging.info("Extracting Named Entities...")
+            df_copy["entities"] = df_copy["cleaned_text"].apply(self.extract_entities) #extract named entities
+            logging.info("NER extraction completed.")
 
         return df_copy.drop(columns=['combined_text', 'cleaned_text']) #drop intermediate columns
     
@@ -122,7 +146,9 @@ def main():
     os.makedirs('data/processed', exist_ok=True)
     os.makedirs('data/raw', exist_ok=True)
 
-    preprocessor = TextPreprocessing(lemmatization=config['preprocessing']['lemmatization']) #initialize preprocessor
+    preprocessor = TextPreprocessing(
+        use_lemmatization=config['preprocessing']['use_lemmatization'], #initialize preprocessor
+        use_ner=config['preprocessing']['use_ner']) #initialize NER
 
     process_file(preprocessor, config['preprocessing']['jobs'], args.input, args.output)
     process_file(preprocessor, config['preprocessing']['resumes'], args.input, args.output)

@@ -3,7 +3,8 @@ data:
   processed_folder: "data/processed"
 
 preprocessing:
-  lemmatization: true
+  use_lemmatization: true
+  use_ner: true
   jobs:
     input_file: 'job_descriptions2.csv'
     output_file: 'job_descriptions_processed.csv'
