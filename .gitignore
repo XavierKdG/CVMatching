@@ -17,3 +17,6 @@ models/
 
 # ignore Jupyter Notebook files
 *.ipynb
+
+# ignore log files
+*.log

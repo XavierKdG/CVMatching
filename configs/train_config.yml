@@ -1,8 +1,0 @@
-epochs: 1000
-alpha: 0.001
-vector_size: 384
-window: 5
-min_count: 1
-seed: 42
-
-

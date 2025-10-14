@@ -1,0 +1,27 @@
+data:
+  raw_folder: "data/raw"
+  processed_folder: "data/processed"
+
+preprocessing:
+  lemmatization: true
+  jobs:
+    input_file: 'job_descriptions2.csv'
+    output_file: 'job_descriptions_processed.csv'
+    columns_to_process: ['Job Description', 'Preferred Skills', 'Work Location 1', 'Business Title']
+    duplicate_subset: ['Job ID']
+  resumes:
+    input_file: 'Resume.csv'
+    output_file: 'resumes_processed.csv'
+    columns_to_process: ['Resume_str', 'Category']
+    duplicate_subset: null
+
+training:
+  epochs: 1000
+  alpha: 0.001
+  vector_size: 384
+  window: 5
+  min_count: 1
+  seed: 42
+
+evaluation:
+  top_k: 10
