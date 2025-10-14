@@ -1,28 +1,54 @@
-data:
+data: 
   raw_folder: "data/raw"
   processed_folder: "data/processed"
 
 preprocessing:
   use_lemmatization: true
   use_ner: true
+
   jobs:
     input_file: 'job_descriptions2.csv'
     output_file: 'job_descriptions_processed.csv'
-    columns_to_process: ['Job Description', 'Preferred Skills', 'Work Location 1', 'Business Title']
+    columns_to_process: ['Job Description', 'Preferred Skills', 'Work Location 1']
     duplicate_subset: ['Job ID']
+
   resumes:
     input_file: 'Resume.csv'
     output_file: 'resumes_processed.csv'
-    columns_to_process: ['Resume_str', 'Category']
+    columns_to_process: ['Resume_str']
     duplicate_subset: null
 
 training:
-  epochs: 1000
+  output_folder: models
+  model_name: "cv_job_matching.model"
+
+  jobs:
+    input_file: 'job_descriptions_processed.csv'
+    output_file: 'job_descriptions_embeddings.csv'
+  resumes:
+    input_file: 'resumes_processed.csv'
+    output_file: 'resumes_embeddings.csv'
+
+  epochs: 100
   alpha: 0.001
   vector_size: 384
   window: 5
   min_count: 1
   seed: 42
 
+qdrant:
+  url: "http://localhost:6333"
+  timeout: 60
+  batch_size: 256
+  collections:
+    jobs:
+      name: "job_embeddings"
+      payload_columns: ["Job ID", "Business Title", "Job Category", "tokens", "entities"]
+      path: 'job_descriptions_embeddings.csv' 
+    resumes:
+      name: "resume_embeddings"
+      payload_columns: ["ID", "Category", "tokens", "entities"]
+      path: 'resumes_embeddings.csv' 
+  
 evaluation:
   top_k: 10
