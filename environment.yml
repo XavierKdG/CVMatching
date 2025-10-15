@@ -11,4 +11,4 @@ dependencies:
   - rapidfuzz
   - gensim
   - spacy
-  - text-preprocessor
+  - tensorflow
