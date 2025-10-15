@@ -6,7 +6,7 @@ import numpy as np
 import random
 import logging
 import ast
-from utils import setup_logging, load_config
+from src.utils import setup_logging, load_config
 
 class Doc2VecTrainer:
     """Class responsible for training and saving Doc2Vec models."""
@@ -118,7 +118,6 @@ def save_embeddings(df, config, dataset_type):
 
 def main():
     """Main function to preprocess datasets."""
-    setup_logging() #setup logging
 
     args = parse_arguments() #parse command line arguments
     config = load_config(args.config) #load config
@@ -143,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    setup_logging() #setup logging

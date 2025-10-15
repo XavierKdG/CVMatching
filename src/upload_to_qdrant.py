@@ -4,7 +4,7 @@ from qdrant_client.http import models
 import ast
 import logging
 import os
-from utils import setup_logging, load_config
+from src.utils import setup_logging, load_config
 
 class QdrantUploader:
     """Class to upload CSV files to Qdrant database"""
@@ -77,10 +77,10 @@ def run_upload_pipeline(config):
     
 def main():
     """Main function to upload to Qdrant"""
-    setup_logging()
     config = load_config()
     run_upload_pipeline(config)
     logging.info("--- Succesfully uploaded to Qdrant ---")
 
 if __name__ == "__main__":
     main()
+    setup_logging()

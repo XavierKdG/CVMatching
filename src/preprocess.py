@@ -9,7 +9,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import argparse
 import logging
-from utils import setup_logging, load_config #help functions
+from src.utils import setup_logging, load_config #help functions
 
 class TextPreprocessing:
     def __init__(self, use_lemmatization=True, use_ner=False):
@@ -116,7 +116,6 @@ def process_file(preprocessor, config_section, raw_dir, processed_dir):
 
 def main():
     """Main function to preprocess datasets."""
-    setup_logging() #setup logging
     
     config = load_config() #load config
     args = parse_arguments(config) #parse command line arguments
@@ -135,3 +134,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    setup_logging() #setup logging
