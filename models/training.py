@@ -13,7 +13,7 @@ print("X shape:", X.shape)
 print("y shape:", y.shape)
 
 #train/test split
-X_train, X_test, y_train, y_test = train_test_split(
+X_train, X_test, y_train, y_test = train_test_split(      
     X, y, test_size=0.2, random_state=42
 )
 
@@ -31,4 +31,4 @@ print(classification_report(y_test, y_pred))
 #model opslaan
 os.makedirs("models", exist_ok=True)
 joblib.dump(model, "models/tfidf.pkl")
-print("Model opgeslagen in models/tfidf.pkl")
+print("opgeslagen in models/tfidf.pkl")
