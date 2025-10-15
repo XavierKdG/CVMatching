@@ -23,7 +23,7 @@ uploaded_cv = st.file_uploader("Upload je CV (als PDF)", type=["pdf"])
 #vacature kiezen
 job_choice = st.selectbox("Kies een vacature", df_jobs["Job Title"])
 
-if st.button("Check CV match"):
+if st.button("CV matching"):
     if uploaded_cv is None:
         st.warning("Upload eerst een PDF van je CV.")
     else:
