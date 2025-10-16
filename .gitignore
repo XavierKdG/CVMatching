@@ -7,6 +7,9 @@ venv/
 # ignore csv files
 *.csv 
 
+# ignore parquet files
+*.parquet
+
 # ignore Python cache files
 __pycache__/
 *.pyc
