@@ -1,0 +1,55 @@
+data: 
+  raw_folder: "data/raw"
+  processed_folder: "data/processed"
+
+preprocessing:
+  use_lemmatization: true
+  use_ner: false 
+  chunksize: 50000
+
+  jobs:
+    input_file: 'job_descriptions.csv'
+    output_file: 'job_descriptions_processed.parquet'
+    columns_to_process: ['Job Description', 'skills', 'location']
+    duplicate_subset: ['Job Id'] 
+
+  resumes:
+    input_file: 'Resume.csv'
+    output_file: 'resumes_processed.parquet'
+    columns_to_process: ['Resume_str']
+    duplicate_subset: null
+
+training:
+  output_folder: models
+  model_name: "cv_job_matching_2.model"
+
+  jobs:
+    input_file: 'job_descriptions_processed.parquet'
+    output_file: 'job_descriptions_embeddings.parquet'
+  resumes:
+    input_file: 'resumes_processed.parquet' 
+    output_file: 'resumes_embeddings.parquet'  
+
+  epochs: 100
+  alpha: 0.001
+  vector_size: 384
+  window: 5
+  min_count: 1
+  seed: 42
+
+qdrant:
+  url: "http://localhost:6333"
+  timeout: 60
+  batch_size: 256
+  collections:
+    jobs:
+      name: "job_embeddings"
+      payload_columns: ["Job Id", "Role", "location", "skills", "tokens", "entities"]
+      path: 'job_descriptions_embeddings.parquet'
+    resumes:
+      name: "resume_embeddings"
+      payload_columns: ["ID", "Category", "tokens", "entities"]
+      path: 'resumes_embeddings.parquet'
+
+evaluation:
+  top_k: 10

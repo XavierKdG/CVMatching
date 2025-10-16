@@ -5,16 +5,17 @@ data:
 preprocessing:
   use_lemmatization: true
   use_ner: true
+  chunksize: 50000
 
   jobs:
     input_file: 'job_descriptions2.csv'
-    output_file: 'job_descriptions_processed.csv'
+    output_file: 'job_descriptions2_processed.parquet'
     columns_to_process: ['Job Description', 'Preferred Skills', 'Work Location 1']
     duplicate_subset: ['Job ID']
 
   resumes:
     input_file: 'Resume.csv'
-    output_file: 'resumes_processed.csv'
+    output_file: 'resumes2_processed.parquet'
     columns_to_process: ['Resume_str']
     duplicate_subset: null
 
@@ -23,11 +24,11 @@ training:
   model_name: "cv_job_matching.model"
 
   jobs:
-    input_file: 'job_descriptions_processed.csv'
-    output_file: 'job_descriptions_embeddings.csv'
+    input_file: 'job_descriptions2_processed.parquet'
+    output_file: 'job_descriptions2_embeddings.parquet'
   resumes:
-    input_file: 'resumes_processed.csv'
-    output_file: 'resumes_embeddings.csv'
+    input_file: 'resumes2_processed.parquet'
+    output_file: 'resumes2_embeddings.parquet'
 
   epochs: 100
   alpha: 0.001
@@ -42,13 +43,14 @@ qdrant:
   batch_size: 256
   collections:
     jobs:
-      name: "job_embeddings"
+      name: "job2_embeddings"
       payload_columns: ["Job ID", "Business Title", "Job Category", "tokens", "entities"]
-      path: 'job_descriptions_embeddings.csv' 
+      path: 'job_descriptions2_embeddings.parquet'
     resumes:
-      name: "resume_embeddings"
+      name: "resumes2_embeddings"
       payload_columns: ["ID", "Category", "tokens", "entities"]
-      path: 'resumes_embeddings.csv' 
+      path: 'resumes2_embeddings.parquet'
+
   
 evaluation:
   top_k: 10
