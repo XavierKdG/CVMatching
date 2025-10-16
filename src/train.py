@@ -6,7 +6,7 @@ import numpy as np
 import random
 import logging
 import ast
-from src.utils import setup_logging, load_config
+from .utils import setup_logging, load_config #help functions
 
 class Doc2VecTrainer:
     """Class responsible for training and saving Doc2Vec models."""
@@ -31,19 +31,32 @@ class Doc2VecTrainer:
         tagged_data = []
 
         for i, row in df.iterrows():
-            words = list(row['tokens'])
+            words = list(row['tokens']) if 'tokens' in row and row['tokens'] is not None else []
 
             if 'entities' in df.columns and pd.notna(row['entities']):
-                try:
-                    entities_dict = ast.literal_eval(row['entities'])
-                    entity_tokens = []
-                    for ent_type, ent_values in entities_dict.items():
-                        for val in ent_values:
+                entities_dict = {}
+                if isinstance(row['entities'], dict):
+                    entities_dict = row['entities']
+                elif isinstance(row['entities'], str):
+                    try:
+                        entities_dict = ast.literal_eval(row['entities'])
+                    except Exception:
+                        import json
+                        try:
+                            entities_dict = json.loads(row['entities'])
+                        except Exception as e:
+                            logging.warning(f"Could not parse entities for row {i}: {e}")
+
+                for ent_type, ent_values in entities_dict.items():
+                    if ent_values is not None:
+                        if isinstance(ent_values, (list, tuple, np.ndarray)):
+                            iterable_values = ent_values
+                        else:
+                            iterable_values = [ent_values]
+
+                        for val in iterable_values:
                             val_clean = "_".join(str(val).split())
-                            entity_tokens.append(f"{ent_type}_{val_clean}")
-                    words.extend(entity_tokens)
-                except Exception as e:
-                    logging.warning(f"Could not parse entities for row {i}: {e}")
+                            words.append(f"{ent_type}_{val_clean}")
 
             tagged_data.append(TaggedDocument(words=words, tags=[f"{prefix}_{i}"]))
 
@@ -74,11 +87,14 @@ class Doc2VecTrainer:
         return model_path
     
     def generate_embeddings(self, df, prefix):
-        """Generate embeddings for a given dataframe."""
-        embeddings = [self.model.dv[f"{prefix}_{i}"].tolist() for i in range(len(df))]
+        """Genereert embeddings op basis van de DataFrame-index."""
+        logging.info(f"Generating embeddings for {len(df)} documents with prefix '{prefix}'...")
+        embeddings = [self.model.dv[f"{prefix}_{i}"].tolist() for i in df.index]
+        
         df["embeddings"] = embeddings
+        logging.info(f"Embeddings generated successfully for prefix '{prefix}'.")
         return df
-
+    
 def parse_arguments():
     """Parse command-line arguments to override the config."""
     parser = argparse.ArgumentParser(description="Train Doc2Vec model on job descriptions and resumes")
@@ -89,7 +105,6 @@ def parse_arguments():
 
 def load_datasets(config):
     """Load and preprocess datasets from configured paths."""
-
     processed_folder = config["data"]["processed_folder"]
 
     jobs_path = os.path.join(processed_folder, config["training"]["jobs"]["input_file"])
@@ -98,11 +113,8 @@ def load_datasets(config):
     logging.info(f"Loading job descriptions from: {jobs_path}")
     logging.info(f"Loading resumes from: {resumes_path}")
 
-    jobs_df = pd.read_csv(jobs_path)
-    resumes_df = pd.read_csv(resumes_path)
-
-    jobs_df["tokens"] = jobs_df["tokens"].apply(eval) #convert strings to python list
-    resumes_df["tokens"] = resumes_df["tokens"].apply(eval) #convert strings to python list
+    jobs_df = pd.read_parquet(jobs_path)
+    resumes_df = pd.read_parquet(resumes_path)
 
     return jobs_df, resumes_df
 
@@ -113,14 +125,14 @@ def save_embeddings(df, config, dataset_type):
     output_path = os.path.join(processed_folder, output_file)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    df.to_csv(output_path, index=False)
+    df.to_parquet(output_path, index=False)
     logging.info(f"{dataset_type.capitalize()} embeddings saved to {output_path}")
 
-def main():
+def main(config_path=None): 
     """Main function to preprocess datasets."""
 
     args = parse_arguments() #parse command line arguments
-    config = load_config(args.config) #load config
+    config = load_config(config_path) #load config
 
     jobs_df, resumes_df = load_datasets(config) #read job/resume dfs
     trainer = Doc2VecTrainer(config) #configure class
@@ -132,8 +144,13 @@ def main():
     trainer.train_model(all_tagged) #train model
     trainer.save_model() #save model
 
+    logging.info("Starting embedding generation for jobs...")
     jobs_df = trainer.generate_embeddings(jobs_df, "job") #create jobs embeddings
+    logging.info("Embedding generation for jobs completed.")
+
+    logging.info("Starting embedding generation for resumes...")
     resumes_df = trainer.generate_embeddings(resumes_df, "cv") #create resumes embeddings
+    logging.info("Embedding generation for resumes completed.")
 
     save_embeddings(jobs_df, config, "jobs") #save job embeddings 
     save_embeddings(resumes_df, config, "resumes") #save resume embeddings 
@@ -141,5 +158,5 @@ def main():
     logging.info("--- Training and embedding generation completed succesfully. ---")
 
 if __name__ == "__main__":
-    main()
     setup_logging() #setup logging
+    main()

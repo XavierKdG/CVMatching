@@ -30,5 +30,12 @@ def setup_logging(log_file_name='pipeline.log'):
 def load_config(config_path="configs/config.yml"):
     """Load configuration from a YAML file."""
     logging.info(f"Configuration loaded from: {config_path}")
+    if config_path is None:
+        config_path = os.path.join(os.path.dirname(__file__), "..", "configs", "config.yml")
+
     with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+
+    return config
+
+    

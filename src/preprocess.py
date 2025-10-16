@@ -9,7 +9,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import argparse
 import logging
-from src.utils import setup_logging, load_config #help functions
+from .utils import setup_logging, load_config #help functions
 
 class TextPreprocessing:
     def __init__(self, use_lemmatization=True, use_ner=False):
@@ -40,19 +40,17 @@ class TextPreprocessing:
         text = re.sub(r'http\S+|www\.\S+', '', text) #remove http & www URLs (used AI for this regex)
         return text.strip() #remove leading/trailing spaces
     
-    def extract_entities(self, text):
-        """Extract name entities from text using spaCy (NER)"""
-        doc = self.nlp(text)
-        entities = {}
-        for ent in doc.ents:
-            if ent.label_ not in entities:
-                entities[ent.label_] = []
-            entities[ent.label_].append(ent.text)
-        
-        for label, items in entities.items():
-            entities[label] = list(set(items))
+    def extract_entities(self, texts):
+        """Batch NER extraction using spaCy pipe."""
+        entities_list = []
+        for doc in self.nlp.pipe(texts, batch_size=50): 
+            entities = {}
+            for ent in doc.ents:
+                entities.setdefault(ent.label_, []).append(ent.text)
 
-        return entities
+            entities = {k: list(set(v)) for k, v in entities.items()}
+            entities_list.append(entities)
+        return entities_list
 
     def tokenize_and_process(self, text):
         """Tokenize the text and apply stemming or lemmatization."""
@@ -82,43 +80,56 @@ class TextPreprocessing:
         df_copy["tokens"] = df_copy["cleaned_text"].apply(self.tokenize_and_process) #tokenize and stem/lemmatize
 
         if self.use_ner:
-            logging.info("Extracting Named Entities...")
-            df_copy["entities"] = df_copy["cleaned_text"].apply(self.extract_entities) #extract named entities
-            logging.info("NER extraction completed.")
+            logging.info("Extracting Named Entities in batch...")
+            df_copy["entities"] = self.extract_entities(df_copy["cleaned_text"].tolist())
 
         return df_copy.drop(columns=['combined_text', 'cleaned_text']) #drop intermediate columns
-
-def parse_arguments(config):
-    """Parse command-line arguments to override the config."""
-    parser = argparse.ArgumentParser(description="Preprocess datasets, with config and overrides.")
-    parser.add_argument('--input', type=str, default=config['data']['raw_folder'], help="Override the input folder.")
-    parser.add_argument('--output', type=str, default=config['data']['processed_folder'], help="Override the output folder.")
-    args = parser.parse_args()
-    logging.info(f"Arguments parsed: {args}")
-    return args
     
-def process_file(preprocessor, config_section, raw_dir, processed_dir):
-    """Process a single CSV file based on the configuration."""
+def process_file(preprocessor, config_section, raw_dir, processed_dir, chunksize=50000):
+    """Process a CSV file in chunks and save as Parquet."""
+    chunksize = config_section.get('chunksize', chunksize)
+
     file_name = config_section['input_file']
     input_path = os.path.join(raw_dir, file_name)
-    output_path = os.path.join(processed_dir, config_section['output_file'])
+    output_path = os.path.join(processed_dir, config_section['output_file'].replace(".csv", ".parquet"))
 
-    logging.info(f"--- Processing file: {file_name} ---")
-    try:
-        df = pd.read_csv(input_path)
-        processed_df = preprocessor.process_dataframe(df=df, columns_to_combine=config_section['columns_to_process'], duplicate_subset=config_section.get('duplicate_subset'))
-        processed_df.to_csv(output_path, index=False)
-        logging.info(f"File saved to {output_path}")
-    except FileNotFoundError:
-        logging.error(f"File not found: {input_path}")
-    except Exception as e:
-        logging.error(f"An error occurred while processing {file_name}: {e}")
+    logging.info(f"--- Processing file: {file_name} with chunksize={chunksize} ---")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-def main():
-    """Main function to preprocess datasets."""
-    
-    config = load_config() #load config
-    args = parse_arguments(config) #parse command line arguments
+    processed_chunks = []
+    for chunk in pd.read_csv(input_path, chunksize=chunksize):
+        processed_df = preprocessor.process_dataframe(
+            df=chunk,
+            columns_to_combine=config_section['columns_to_process'],
+            duplicate_subset=config_section.get('duplicate_subset')
+        )
+        processed_chunks.append(processed_df)
+
+    pd.concat(processed_chunks).to_parquet(output_path, index=False)
+    logging.info(f"File saved to {output_path}")
+
+def main(input_dir=None, output_dir=None, config_path=None, parse_args=True):
+    """
+    Preprocess datasets.
+    - input_dir/output_dir: optional overrides
+    - config_path: optional config file
+    - parse_args: set False when called from pipeline
+    """
+    config = load_config(config_path) #load config
+
+    if parse_args:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--input", type=str, default=config['data']['raw_folder'])
+        parser.add_argument("--output", type=str, default=config['data']['processed_folder'])
+        parser.add_argument("--config", type=str, default=config_path or "configs/config.yml")
+        args = parser.parse_args()
+        input_dir = args.input
+        output_dir = args.output
+        config_path = args.config
+
+    input_dir = input_dir or config['data']['raw_folder']
+    output_dir = output_dir or config['data']['processed_folder']
+    chunksize = config['preprocessing'].get('chunksize', 50000)
 
     os.makedirs(config['data']['raw_folder'], exist_ok=True)
     os.makedirs(config['data']['processed_folder'], exist_ok=True)
@@ -127,11 +138,11 @@ def main():
         use_lemmatization=config['preprocessing']['use_lemmatization'], #initialize preprocessor
         use_ner=config['preprocessing']['use_ner']) #initialize NER
 
-    process_file(preprocessor, config['preprocessing']['jobs'], args.input, args.output)
-    process_file(preprocessor, config['preprocessing']['resumes'], args.input, args.output)
+    process_file(preprocessor, config['preprocessing']['jobs'], args.input, args.output, chunksize=chunksize)
+    process_file(preprocessor, config['preprocessing']['resumes'], args.input, args.output, chunksize=chunksize)
 
     logging.info("--- Preprocessing complete ---")
 
 if __name__ == "__main__":
-    main()
     setup_logging() #setup logging
+    main()
