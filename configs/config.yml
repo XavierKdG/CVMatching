@@ -20,7 +20,7 @@ datasets:
 
 preprocessing:
   use_lemmatization: true
-  use_ner: false
+  use_ner: true
   chunksize: 50000
 
 training:
