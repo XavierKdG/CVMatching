@@ -7,6 +7,9 @@ venv/
 # ignore csv files
 *.csv 
 
+# ignore jsonl files
+*.jsonl
+
 # ignore parquet files
 *.parquet
 
