@@ -3,6 +3,7 @@ import argparse
 import pandas as pd
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 import numpy as np
+from datetime import datetime
 import random
 import logging
 import ast
@@ -10,7 +11,7 @@ from .utils import setup_logging, load_config #help functions
 
 class Doc2VecTrainer:
     """Class responsible for training and saving Doc2Vec models."""
-    def __init__(self, config):
+    def __init__(self, config, config_path=None):
         training_cfg  = config['training']
 
         self.vector_size = training_cfg.get("vector_size", 50)
@@ -19,8 +20,14 @@ class Doc2VecTrainer:
         self.epochs = training_cfg.get("epochs", 100)
         self.alpha = training_cfg.get("alpha", 0.001)
         self.seed = training_cfg.get("seed", 42)
-        self.output_folder = training_cfg["output_folder"]
-        self.model_name = training_cfg["model_name"]
+        
+        base_model_folder = config['paths'].get("model_folder", "models")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.output_folder = os.path.join(base_model_folder, f"run_{timestamp}")
+        os.makedirs(self.output_folder, exist_ok=True)
+
+        config_name = os.path.splitext(os.path.basename(config_path or "config.yml"))[0]
+        self.model_name = f"cv_job_matching_{config_name}.model"
 
         random.seed(self.seed)
         np.random.seed(self.seed)
@@ -80,7 +87,6 @@ class Doc2VecTrainer:
 
     def save_model(self):
         """Save the trained Doc2Vec model."""
-        os.makedirs(self.output_folder, exist_ok=True)
         model_path = os.path.join(self.output_folder, self.model_name)
         self.model.save(model_path)
         logging.info(f"Model saved at {model_path}")
@@ -105,10 +111,13 @@ def parse_arguments():
 
 def load_datasets(config):
     """Load and preprocess datasets from configured paths."""
-    processed_folder = config["data"]["processed_folder"]
+    processed_folder = config["paths"]["processed_folder"]
 
-    jobs_path = os.path.join(processed_folder, config["training"]["jobs"]["input_file"])
-    resumes_path = os.path.join(processed_folder, config["training"]["resumes"]["input_file"])
+    jobs_file = os.path.splitext(config["datasets"]["jobs"]["input_filename"])[0] + "_processed.parquet"
+    resumes_file = os.path.splitext(config["datasets"]["resumes"]["input_filename"])[0] + "_processed.parquet"
+
+    jobs_path = os.path.join(processed_folder, jobs_file)
+    resumes_path = os.path.join(processed_folder, resumes_file)
 
     logging.info(f"Loading job descriptions from: {jobs_path}")
     logging.info(f"Loading resumes from: {resumes_path}")
@@ -118,24 +127,28 @@ def load_datasets(config):
 
     return jobs_df, resumes_df
 
-def save_embeddings(df, config, dataset_type):
+def save_embeddings(df, config, dataset_key):
     """Save dataframe with embeddings to processed folder."""
-    processed_folder = config["data"]["processed_folder"]
-    output_file = config["training"][dataset_type]["output_file"]
-    output_path = os.path.join(processed_folder, output_file)
+    processed_folder = config["paths"]["processed_folder"]
 
+    input_filename = config["datasets"][dataset_key]["input_filename"]
+    base_name = os.path.splitext(input_filename)[0]
+    output_filename = f"{base_name}_embeddings.parquet"
+
+    output_path = os.path.join(processed_folder, output_filename)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_parquet(output_path, index=False)
-    logging.info(f"{dataset_type.capitalize()} embeddings saved to {output_path}")
+
+    logging.info(f"{dataset_key.capitalize()} embeddings saved to {output_path}")
 
 def main(config_path=None): 
     """Main function to preprocess datasets."""
-
-    args = parse_arguments() #parse command line arguments
-    config = load_config(config_path) #load config
+    args = parse_arguments()
+    config_file = config_path or args.config #parse command line arguments
+    config = load_config(config_path or args.config) #load config
 
     jobs_df, resumes_df = load_datasets(config) #read job/resume dfs
-    trainer = Doc2VecTrainer(config) #configure class
+    trainer = Doc2VecTrainer(config, config_path=config_file) #configure class
 
     tagged_jobs = trainer.tag_data(jobs_df, "job")
     tagged_resumes = trainer.tag_data(resumes_df, "cv")
@@ -144,13 +157,11 @@ def main(config_path=None):
     trainer.train_model(all_tagged) #train model
     trainer.save_model() #save model
 
-    logging.info("Starting embedding generation for jobs...")
+    logging.info("Generating embeddings for jobs...")
     jobs_df = trainer.generate_embeddings(jobs_df, "job") #create jobs embeddings
-    logging.info("Embedding generation for jobs completed.")
 
-    logging.info("Starting embedding generation for resumes...")
+    logging.info("Generating embeddings for resumes...")
     resumes_df = trainer.generate_embeddings(resumes_df, "cv") #create resumes embeddings
-    logging.info("Embedding generation for resumes completed.")
 
     save_embeddings(jobs_df, config, "jobs") #save job embeddings 
     save_embeddings(resumes_df, config, "resumes") #save resume embeddings 

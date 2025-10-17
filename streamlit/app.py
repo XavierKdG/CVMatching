@@ -18,7 +18,7 @@ from src.preprocess import TextPreprocessing  # Your preprocessing class
 st.set_page_config(page_title="CV Matcher", page_icon="📄", layout="centered")
 
 # --- STATIC IMPORTS ---
-MODEL_PATH = PROJECT_ROOT / "models/cv_job_matching_2.model"
+MODEL_PATH = PROJECT_ROOT / "models/cv_job_matching_config_20251017_024323.model"
 EVALUATOR_MODEL = Doc2Vec.load(str(MODEL_PATH))
 PREPROCESSOR = TextPreprocessing(use_lemmatization=True)
 QDRANT_CLIENT = QdrantClient(url="http://localhost:6333")
@@ -65,7 +65,7 @@ if uploaded_file is not None:
 
     # --- QDRANT SEARCH ---
     search_results = QDRANT_CLIENT.search(
-        collection_name="job_embeddings",
+        collection_name="job2_embeddings",
         query_vector=vector.tolist(),
         limit=10
     )
@@ -73,6 +73,6 @@ if uploaded_file is not None:
     # --- DISPLAY RESULTS ---
     st.write("Top 10 Matching Jobs:")
     for result in search_results:
-        st.write(f"**Job Title:** {result.payload.get('Busine ss Title', 'N/A')}")
+        st.write(f"**Job Title:** {result.payload.get('Business Title', 'N/A')}")
         st.write(f"**Similarity Score:** {round(result.score * 100, 2)}%")
         st.divider()

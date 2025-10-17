@@ -19,7 +19,7 @@ class TextPreprocessing:
         nltk.download('wordnet', quiet=True) #download once
         nltk.download('punkt_tab', quiet=True) #download once
 
-        self.nlp = spacy.load("en_core_web_sm") #spacy model
+        self.nlp = spacy.load("en_core_web_lg") #spacy model
         self.stop_words = set(stopwords.words('english')) #for now english stopwords only
 
         self.use_lemmatizer = use_lemmatization
@@ -85,13 +85,12 @@ class TextPreprocessing:
 
         return df_copy.drop(columns=['combined_text', 'cleaned_text']) #drop intermediate columns
     
-def process_file(preprocessor, config_section, raw_dir, processed_dir, chunksize=50000):
-    """Process a CSV file in chunks and save as Parquet."""
-    chunksize = config_section.get('chunksize', chunksize)
-
-    file_name = config_section['input_file']
+def process_file(preprocessor, dataset_config, raw_dir, processed_dir, chunksize=50000):
+    """Process a dataset (CSV) in chunks and save as Parquet."""
+    file_name = dataset_config["input_filename"]
     input_path = os.path.join(raw_dir, file_name)
-    output_path = os.path.join(processed_dir, config_section['output_file'].replace(".csv", ".parquet"))
+    output_filename = os.path.splitext(file_name)[0] + "_processed.parquet"
+    output_path = os.path.join(processed_dir, output_filename)
 
     logging.info(f"--- Processing file: {file_name} with chunksize={chunksize} ---")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -100,8 +99,8 @@ def process_file(preprocessor, config_section, raw_dir, processed_dir, chunksize
     for chunk in pd.read_csv(input_path, chunksize=chunksize):
         processed_df = preprocessor.process_dataframe(
             df=chunk,
-            columns_to_combine=config_section['columns_to_process'],
-            duplicate_subset=config_section.get('duplicate_subset')
+            columns_to_combine=dataset_config["columns_to_process"],
+            duplicate_subset=dataset_config.get("duplicate_subset")
         )
         processed_chunks.append(processed_df)
 
@@ -119,27 +118,27 @@ def main(input_dir=None, output_dir=None, config_path=None, parse_args=True):
 
     if parse_args:
         parser = argparse.ArgumentParser()
-        parser.add_argument("--input", type=str, default=config['data']['raw_folder'])
-        parser.add_argument("--output", type=str, default=config['data']['processed_folder'])
+        parser.add_argument("--input", type=str, default=config["paths"]["raw_folder"])
+        parser.add_argument("--output", type=str, default=config["paths"]["processed_folder"])
         parser.add_argument("--config", type=str, default=config_path or "configs/config.yml")
         args = parser.parse_args()
         input_dir = args.input
         output_dir = args.output
         config_path = args.config
 
-    input_dir = input_dir or config['data']['raw_folder']
-    output_dir = output_dir or config['data']['processed_folder']
-    chunksize = config['preprocessing'].get('chunksize', 50000)
+    input_dir = input_dir or config["paths"]["raw_folder"]
+    output_dir = output_dir or config["paths"]["processed_folder"]
+    chunksize = config["preprocessing"].get("chunksize", 50000)
 
-    os.makedirs(config['data']['raw_folder'], exist_ok=True)
-    os.makedirs(config['data']['processed_folder'], exist_ok=True)
+    os.makedirs(input_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
     preprocessor = TextPreprocessing(
         use_lemmatization=config['preprocessing']['use_lemmatization'], #initialize preprocessor
         use_ner=config['preprocessing']['use_ner']) #initialize NER
 
-    process_file(preprocessor, config['preprocessing']['jobs'], args.input, args.output, chunksize=chunksize)
-    process_file(preprocessor, config['preprocessing']['resumes'], args.input, args.output, chunksize=chunksize)
+    process_file(preprocessor, config["datasets"]["jobs"], input_dir, output_dir, chunksize=chunksize)
+    process_file(preprocessor, config["datasets"]["resumes"], input_dir, output_dir, chunksize=chunksize)
 
     logging.info("--- Preprocessing complete ---")
 

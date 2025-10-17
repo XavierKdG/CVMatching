@@ -16,6 +16,11 @@ class QdrantUploader:
         logging.info(f"Starting upload for collection '{collection_name}' (batch size={batch_size})")
         df = pd.read_parquet(parquet_path)
 
+        extra_cols = [col for col in ['tokens', 'entities'] if col in df.columns]
+        all_payload_cols = list(set(payload_columns + extra_cols))
+
+        logging.info(f"Using payload columns: {all_payload_cols}")
+
         def force_list(x):
             if hasattr(x, 'tolist'):
                 x = x.tolist()
@@ -24,7 +29,7 @@ class QdrantUploader:
         vectors = df['embeddings'].apply(force_list).tolist()
 
         ids = df.index.tolist()
-        df_payload = df[payload_columns]
+        df_payload = df[all_payload_cols]
  
         def convert_numpy_to_list(obj):
             if isinstance(obj, np.ndarray):
@@ -41,7 +46,7 @@ class QdrantUploader:
         embedding_dim = len(vectors[0])
 
         if self.client.collection_exists(collection_name):
-            logging.warning(f"Collection '{collection_name}' exists and will be deleted.")
+            logging.warning(f"Collection '{collection_name}' already exists and will be deleted.")
             self.client.delete_collection(collection_name)
 
         logging.info(f"Creating collection '{collection_name}'")
@@ -66,13 +71,19 @@ class QdrantUploader:
 def run_upload_pipeline(config):
     qdrant_config = config['qdrant']
     uploader = QdrantUploader(qdrant_url=qdrant_config['url'], timeout=qdrant_config.get('timeout', 20))
-    processed_folder = config['data']['processed_folder']
+    processed_folder = config['paths']['processed_folder']
     batch_size = qdrant_config.get('batch_size', 128)
 
-    for key, col_cfg in qdrant_config['collections'].items():
-        parquet_path = os.path.join(processed_folder, col_cfg['path'])
+    for dataset_name, dataset_cfg in config['datasets'].items():
+        input_file_stem = os.path.splitext(dataset_cfg['input_filename'])[0]
+        parquet_file = f"{input_file_stem}_embeddings.parquet"
+        parquet_path = os.path.join(processed_folder, parquet_file)
+
+        collection_name = dataset_cfg.get('qdrant_collection_name')
+        payload_columns = dataset_cfg.get('qdrant_payload_columns', [])
+
         if os.path.exists(parquet_path):
-            uploader.upload_collection(parquet_path, col_cfg['name'], col_cfg['payload_columns'], batch_size)
+            uploader.upload_collection(parquet_path, collection_name, payload_columns, batch_size)
         else:
             logging.error(f"File not found: {parquet_path}")
 
@@ -83,4 +94,5 @@ def main(config_path=None):
     logging.info("--- Successfully uploaded to Qdrant ---")
 
 if __name__ == "__main__":
+    setup_logging() 
     main()
