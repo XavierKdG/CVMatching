@@ -6,17 +6,17 @@ paths:
 datasets:
   jobs:
     input_filename: 'job_descriptions2.csv'
-    columns_to_process: ['Job Description', 'Preferred Skills', 'Work Location 1']
+    columns_to_process: ['Job Description', 'Preferred Skills', 'Business Title', 'Minimum Qual Requirements', 'Job Category', 'Division/Work Unit']
     duplicate_subset: ['Job ID']
-    qdrant_collection_name: "job2_embeddings"
-    qdrant_payload_columns: ["Job ID", "Business Title", "Job Category"]
+    qdrant_collection_name: "job_embeddings1"
+    qdrant_payload_columns: ["Job ID", "Business Title", "Job Category", "Division/Work Unit"]
 
   resumes:
     input_filename: 'Resume.csv'
     columns_to_process: ['Resume_str']
-    duplicate_subset: null 
-    qdrant_collection_name: "resumes2_embeddings"
-    qdrant_payload_columns: ["ID", "Category"]
+    duplicate_subset: null
+    qdrant_collection_name: "resumes_embeddings1"
+    qdrant_payload_columns: ["ID", "Category", "tokens"]
 
 preprocessing:
   use_lemmatization: true
