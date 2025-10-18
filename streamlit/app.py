@@ -18,7 +18,9 @@ from src.preprocess import TextPreprocessing  # Your preprocessing class
 st.set_page_config(page_title="CV Matcher", page_icon="📄", layout="centered")
 
 # --- STATIC IMPORTS ---
-MODEL_PATH = PROJECT_ROOT / "models/cv_job_matching_config_20251017_024323.model"
+# MODEL_PATH = PROJECT_ROOT / "models/cv_job_matching_config_20251017_024323.model"
+# MODEL_PATH = 'models/run_20251017_033959/cv_job_matching_config1.model'
+MODEL_PATH = 'models/run_20251017_232740/cv_job_matching_config.model'
 EVALUATOR_MODEL = Doc2Vec.load(str(MODEL_PATH))
 PREPROCESSOR = TextPreprocessing(use_lemmatization=True)
 QDRANT_CLIENT = QdrantClient(url="http://localhost:6333")

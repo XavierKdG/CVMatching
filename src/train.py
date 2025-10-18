@@ -8,6 +8,7 @@ import random
 import logging
 import ast
 from .utils import setup_logging, load_config #help functions
+from .upload_to_qdrant import QdrantUploader
 
 class Doc2VecTrainer:
     """Class responsible for training and saving Doc2Vec models."""
@@ -142,32 +143,52 @@ def save_embeddings(df, config, dataset_key):
     logging.info(f"{dataset_key.capitalize()} embeddings saved to {output_path}")
 
 def main(config_path=None): 
-    """Main function to preprocess datasets."""
+    """Main function to train, generate embeddings, and upload to Qdrant."""
     args = parse_arguments()
-    config_file = config_path or args.config #parse command line arguments
-    config = load_config(config_path or args.config) #load config
+    config_file = config_path or args.config
+    config = load_config(config_file)
 
-    jobs_df, resumes_df = load_datasets(config) #read job/resume dfs
-    trainer = Doc2VecTrainer(config, config_path=config_file) #configure class
+    jobs_df, resumes_df = load_datasets(config)
+    trainer = Doc2VecTrainer(config, config_path=config_file)
 
     tagged_jobs = trainer.tag_data(jobs_df, "job")
     tagged_resumes = trainer.tag_data(resumes_df, "cv")
     all_tagged = tagged_jobs + tagged_resumes
     
-    trainer.train_model(all_tagged) #train model
-    trainer.save_model() #save model
+    trainer.train_model(all_tagged)
+    trainer.save_model()
 
     logging.info("Generating embeddings for jobs...")
-    jobs_df = trainer.generate_embeddings(jobs_df, "job") #create jobs embeddings
+    jobs_df_with_embeddings = trainer.generate_embeddings(jobs_df, "job")
 
     logging.info("Generating embeddings for resumes...")
-    resumes_df = trainer.generate_embeddings(resumes_df, "cv") #create resumes embeddings
+    resumes_df_with_embeddings = trainer.generate_embeddings(resumes_df, "cv")
 
-    save_embeddings(jobs_df, config, "jobs") #save job embeddings 
-    save_embeddings(resumes_df, config, "resumes") #save resume embeddings 
+    logging.info("--- Starting direct upload to Qdrant ---")
 
-    logging.info("--- Training and embedding generation completed succesfully. ---")
+    qdrant_config = config['qdrant']
+    uploader = QdrantUploader(qdrant_url=qdrant_config['url'], timeout=qdrant_config.get('timeout', 60))
+    batch_size = qdrant_config.get('batch_size', 256)
+
+    jobs_config = config['datasets']['jobs']
+    uploader.upload_dataframe(
+        df=jobs_df_with_embeddings,
+        collection_name=jobs_config['qdrant_collection_name'],
+        payload_columns=jobs_config['qdrant_payload_columns'],
+        batch_size=batch_size
+    )
+
+    resumes_config = config['datasets']['resumes']
+    uploader.upload_dataframe(
+        df=resumes_df_with_embeddings,
+        collection_name=resumes_config['qdrant_collection_name'],
+        payload_columns=resumes_config['qdrant_payload_columns'],
+        batch_size=batch_size
+    )
+
+    logging.info("--- Training, embedding, and uploading completed successfully. ---")
+
 
 if __name__ == "__main__":
-    setup_logging() #setup logging
+    setup_logging()
     main()
