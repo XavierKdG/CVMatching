@@ -19,7 +19,6 @@ datasets:
     qdrant_payload_columns: ["ID", "Category"]
 
 preprocessing:
-  use_lemmatization: true
   use_ner: true
   chunksize: 50000
 

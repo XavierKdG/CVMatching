@@ -4,7 +4,7 @@ import yaml
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-def setup_logging(log_file_name='pipeline.log'):
+def setup_logging(log_file_name):
     """Configure logging to log_file_name"""
     os.makedirs('logs', exist_ok=True)
     log_path = os.path.join('logs', log_file_name)
@@ -25,17 +25,30 @@ def setup_logging(log_file_name='pipeline.log'):
             logging.StreamHandler() 
         ]
     )
+
+    logging.getLogger("qdrant_client").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    
     logging.info(f"Logging configured. Output added: {log_path}")
 
-def load_config(config_path="configs/config.yml"):
+def load_config(config_path=None):
     """Load configuration from a YAML file."""
-    logging.info(f"Configuration loaded from: {config_path}")
     if config_path is None:
-        config_path = os.path.join(os.path.dirname(__file__), "..", "configs", "config.yml")
+        default_path = os.path.join(os.path.dirname(__file__), "..", "configs", "config.yml")
+        logging.info(f"No config path provided. Using default: {default_path}")
+        config_path = default_path
 
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+    logging.info(f"Loading configuration from: {config_path}")
 
-    return config
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+        return config
+    except FileNotFoundError:
+        logging.error(f"Configuration file not found at: {config_path}")
+        raise
+    except Exception as e:
+        logging.error(f"Error loading configuration from {config_path}: {e}")
+        raise
 
     

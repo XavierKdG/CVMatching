@@ -1,194 +1,137 @@
 import os
 import argparse
 import pandas as pd
-from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-import numpy as np
-from datetime import datetime
-import random
+import shutil
+import subprocess
 import logging
-import ast
+import spacy
+from spacy.cli.train import train as spacy_train
+from spacy.cli.convert import convert as spacy_convert
+from pathlib import Path
 from .utils import setup_logging, load_config #help functions
-from .upload_to_qdrant import QdrantUploader
+import src.upload_to_qdrant as uploader
 
-class Doc2VecTrainer:
-    """Class responsible for training and saving Doc2Vec models."""
-    def __init__(self, config, config_path=None):
-        training_cfg  = config['training']
-
-        self.vector_size = training_cfg.get("vector_size", 50)
-        self.window = training_cfg.get("window", 5)
-        self.min_count = training_cfg.get("min_count", 5)
-        self.epochs = training_cfg.get("epochs", 100)
-        self.alpha = training_cfg.get("alpha", 0.001)
-        self.seed = training_cfg.get("seed", 42)
+class ModelTrainer:
+    """Handles the spaCy NER model training pipeline."""
+    def __init__(self, config):
+        """Initializes the trainer with paths from the config."""
+        logging.info("Initializing ModelTrainer...")
+        self.config = config
+        self.spacy_config_path = Path(config["paths"]["spacy_config"])
+        self.model_output_path = Path(config["paths"]["models_folder"])
+        self.processed_dir = Path(config["paths"]["processed_folder"])
         
-        base_model_folder = config['paths'].get("model_folder", "models")
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.output_folder = os.path.join(base_model_folder, f"run_{timestamp}")
-        os.makedirs(self.output_folder, exist_ok=True)
+        self.train_spacy_file = self.processed_dir / "train.spacy"
+        self.dev_spacy_file = self.processed_dir / "dev.spacy"
 
-        config_name = os.path.splitext(os.path.basename(config_path or "config.yml"))[0]
-        self.model_name = f"cv_job_matching_{config_name}.model"
-
-        random.seed(self.seed)
-        np.random.seed(self.seed)
-
-        logging.info(f"Trainer initialized for {self.epochs} epochs and vector size {self.vector_size}.")
-
-    def tag_data(self, df, prefix=''):
-        tagged_data = []
-
-        for i, row in df.iterrows():
-            words = list(row['tokens']) if 'tokens' in row and row['tokens'] is not None else []
-
-            if 'entities' in df.columns and pd.notna(row['entities']):
-                entities_dict = {}
-                if isinstance(row['entities'], dict):
-                    entities_dict = row['entities']
-                elif isinstance(row['entities'], str):
-                    try:
-                        entities_dict = ast.literal_eval(row['entities'])
-                    except Exception:
-                        import json
-                        try:
-                            entities_dict = json.loads(row['entities'])
-                        except Exception as e:
-                            logging.warning(f"Could not parse entities for row {i}: {e}")
-
-                for ent_type, ent_values in entities_dict.items():
-                    if ent_values is not None:
-                        if isinstance(ent_values, (list, tuple, np.ndarray)):
-                            iterable_values = ent_values
-                        else:
-                            iterable_values = [ent_values]
-
-                        for val in iterable_values:
-                            val_clean = "_".join(str(val).split())
-                            words.append(f"{ent_type}_{val_clean}")
-
-            tagged_data.append(TaggedDocument(words=words, tags=[f"{prefix}_{i}"]))
-
-        return tagged_data
-
-    def train_model(self, tagged_data):
-        """Train a Doc2Vec model on tagged data."""
-        self.model = Doc2Vec(vector_size=self.vector_size,
-                             window=self.window,
-                             min_count=self.min_count,
-                             epochs=self.epochs,
-                             alpha=self.alpha,
-                             seed=self.seed)
+    def generate_spacy_config(self):
+        """Generates the spacy_base_config.cfg file using settings from config.yml."""
+        optimizer = self.config["training"]["optimizer"]
+        seed = self.config["training"]["seed"]
         
-        self.model.build_vocab(tagged_data)
-
-        logging.info(f'Starting training for {self.epochs} epochs...')
-        self.model.train(tagged_data, total_examples=self.model.corpus_count, epochs=self.model.epochs)
-        logging.info('Training completed')
-        return self.model
-
-    def save_model(self):
-        """Save the trained Doc2Vec model."""
-        model_path = os.path.join(self.output_folder, self.model_name)
-        self.model.save(model_path)
-        logging.info(f"Model saved at {model_path}")
-        return model_path
-    
-    def generate_embeddings(self, df, prefix):
-        """Genereert embeddings op basis van de DataFrame-index."""
-        logging.info(f"Generating embeddings for {len(df)} documents with prefix '{prefix}'...")
-        embeddings = [self.model.dv[f"{prefix}_{i}"].tolist() for i in df.index]
+        logging.info(f"Generating spaCy config at: {self.spacy_config_path}")
         
-        df["embeddings"] = embeddings
-        logging.info(f"Embeddings generated successfully for prefix '{prefix}'.")
-        return df
+        command = [
+            "python", "-m", "spacy", "init", "config",
+            str(self.spacy_config_path),
+            "--lang", "en",
+            "--pipeline", "ner",
+            "--optimize", optimizer,
+            "--force"
+        ]
+        
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            
+            config_text = self.spacy_config_path.read_text()
+            config_text = config_text.replace("seed = 0", f"seed = {seed}")
+            self.spacy_config_path.write_text(config_text)
+            logging.info(f"Set seed to {seed} in {self.spacy_config_path}")
+            
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to generate spaCy config: {e.stderr}")
+            raise
+        except Exception as e:
+            logging.error(f"Failed to update seed in config file: {e}")
+            raise
+
+    def run_training(self):
+        """Trains the spaCy NER model using the generated config and .spacy files. Streams the training output to the log."""
+        logging.info("--- Starting spaCy Model Training ---")
+        command = [
+            "python", "-m", "spacy", "train", 
+            str(self.spacy_config_path), 
+            "--output", str(self.model_output_path), 
+            "--paths.train", str(self.train_spacy_file), 
+            "--paths.dev", str(self.dev_spacy_file)
+            # "--gpu-id", '-1'  # Use GPU 0. Set to -1 to force CPU.
+        ]
+        
+        logging.info(f"Running training command: {' '.join(command)}")
+        
+        try:
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+            
+            for line in iter(process.stdout.readline, ''):
+                if line:
+                    logging.info(line.strip())
+            
+            process.wait()
+            
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, command, "Training process failed.")
+                
+            logging.info(f"--- Training Complete. Model saved to: {self.model_output_path} ---")
+            
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Training failed: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"An unexpected error occurred during training: {e}")
+            raise
+
+    def load_model(self):
+        """Loads the best trained model from the output directory."""
+        best_model_path = self.model_output_path / "model-best"
+        if not best_model_path.exists():
+            logging.error(f"Trained model not found at {best_model_path}")
+            return None
+        
+        logging.info(f"Loading trained model from {best_model_path}")
+        return spacy.load(best_model_path)
+
+    def run_pipeline(self):
+        """Runs the full training pipeline: config + training."""
+        self.generate_spacy_config()
+        self.run_training()
+
+def main(config_path=None):
+    """Main function to run the training and Qdrant upload pipeline."""
+    if config_path is None:
+        config_path = "configs/config.yml" 
+        
+    config = load_config(config_path) 
+    setup_logging(config["logging"]["file_name"])
+
+    if config["pipeline"]["mode"] == "custom":
+        logging.info("Pipeline mode is 'custom'. Proceeding with NER model training.")
+        trainer = ModelTrainer(config)
+        trainer.run_pipeline()
+    else:
+        logging.info("Pipeline mode is 'base'. Skipping NER model training.")
+
+    logging.info("--- Proceeding to upload data to Qdrant ---")
+    try:
+        uploader.main(config_path=config_path)
+    except Exception as e:
+        logging.error(f"Failed to run Qdrant upload pipeline: {e}")
+        raise
     
-def parse_arguments():
-    """Parse command-line arguments to override the config."""
-    parser = argparse.ArgumentParser(description="Train Doc2Vec model on job descriptions and resumes")
-    parser.add_argument('--config', type=str, default='configs/config.yml', help="Path to YAML config file")
-    args = parser.parse_args()
-    logging.info(f"Arguments parsed: {args}")
-    return args
-
-def load_datasets(config):
-    """Load and preprocess datasets from configured paths."""
-    processed_folder = config["paths"]["processed_folder"]
-
-    jobs_file = os.path.splitext(config["datasets"]["jobs"]["input_filename"])[0] + "_processed.parquet"
-    resumes_file = os.path.splitext(config["datasets"]["resumes"]["input_filename"])[0] + "_processed.parquet"
-
-    jobs_path = os.path.join(processed_folder, jobs_file)
-    resumes_path = os.path.join(processed_folder, resumes_file)
-
-    logging.info(f"Loading job descriptions from: {jobs_path}")
-    logging.info(f"Loading resumes from: {resumes_path}")
-
-    jobs_df = pd.read_parquet(jobs_path)
-    resumes_df = pd.read_parquet(resumes_path)
-
-    return jobs_df, resumes_df
-
-def save_embeddings(df, config, dataset_key):
-    """Save dataframe with embeddings to processed folder."""
-    processed_folder = config["paths"]["processed_folder"]
-
-    input_filename = config["datasets"][dataset_key]["input_filename"]
-    base_name = os.path.splitext(input_filename)[0]
-    output_filename = f"{base_name}_embeddings.parquet"
-
-    output_path = os.path.join(processed_folder, output_filename)
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    df.to_parquet(output_path, index=False)
-
-    logging.info(f"{dataset_key.capitalize()} embeddings saved to {output_path}")
-
-def main(config_path=None): 
-    """Main function to train, generate embeddings, and upload to Qdrant."""
-    args = parse_arguments()
-    config_file = config_path or args.config
-    config = load_config(config_file)
-
-    jobs_df, resumes_df = load_datasets(config)
-    trainer = Doc2VecTrainer(config, config_path=config_file)
-
-    tagged_jobs = trainer.tag_data(jobs_df, "job")
-    tagged_resumes = trainer.tag_data(resumes_df, "cv")
-    all_tagged = tagged_jobs + tagged_resumes
-    
-    trainer.train_model(all_tagged)
-    trainer.save_model()
-
-    logging.info("Generating embeddings for jobs...")
-    jobs_df_with_embeddings = trainer.generate_embeddings(jobs_df, "job")
-
-    logging.info("Generating embeddings for resumes...")
-    resumes_df_with_embeddings = trainer.generate_embeddings(resumes_df, "cv")
-
-    logging.info("--- Starting direct upload to Qdrant ---")
-
-    qdrant_config = config['qdrant']
-    uploader = QdrantUploader(qdrant_url=qdrant_config['url'], timeout=qdrant_config.get('timeout', 60))
-    batch_size = qdrant_config.get('batch_size', 256)
-
-    jobs_config = config['datasets']['jobs']
-    uploader.upload_dataframe(
-        df=jobs_df_with_embeddings,
-        collection_name=jobs_config['qdrant_collection_name'],
-        payload_columns=jobs_config['qdrant_payload_columns'],
-        batch_size=batch_size
-    )
-
-    resumes_config = config['datasets']['resumes']
-    uploader.upload_dataframe(
-        df=resumes_df_with_embeddings,
-        collection_name=resumes_config['qdrant_collection_name'],
-        payload_columns=resumes_config['qdrant_payload_columns'],
-        batch_size=batch_size
-    )
-
-    logging.info("--- Training, embedding, and uploading completed successfully. ---")
-
+    logging.info("--- Full Train & Upload Pipeline Complete ---")
 
 if __name__ == "__main__":
-    setup_logging()
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="configs/config.yml", help="Path to the config.yml file")
+    args = parser.parse_args()
+    
+    main(config_path=args.config)
