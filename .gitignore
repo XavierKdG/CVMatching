@@ -7,8 +7,26 @@ venv/
 # ignore csv files
 *.csv 
 
+# ignore spacy files
+*.spacy
+
+# ignore jsonl files
+*.jsonl
+*.json
+
+# ignore parquet files
+*.parquet
+
+# ignore Python cache files
+__pycache__/
+*.pyc
+
 # ignore model files
 *.pth
+models/
 
 # ignore Jupyter Notebook files
 *.ipynb
+
+# ignore log files
+*.log

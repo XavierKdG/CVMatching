@@ -5,7 +5,7 @@ channels:
   - conda-forge
 
 dependencies:
-  - python=3.12.7
+  - python=3.12
   - pandas
   - numpy
   - scikit-learn
@@ -16,9 +16,13 @@ dependencies:
   - nltk
   - pip
   - spacy-model-en_core_web_sm
-  - pip:
-    - spacy
-    - word2vec
-    - sentence-transformers
-    - transformers
-    - qdrant-client
+  - spacy-model-en_core_web_lg
+  - ipython<9 
+  - jupyter
+  - spacy
+  - sentence-transformers
+  - transformers
+  - qdrant-client
+  - gensim=4.3.3
+  - pyyaml
+  - tf-keras

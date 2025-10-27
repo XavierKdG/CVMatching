@@ -1,0 +1,56 @@
+pipeline:
+  mode: 'custom'
+
+logging:
+  file_name: "pipeline.log"
+
+paths:
+  raw_folder: "data/raw"
+  processed_folder: "data/processed"
+  models_folder: "models"
+  spacy_config: "configs/spacy_config.cfg"
+
+models:
+  base_model: "en_core_web_sm"
+  similarity_model: "all-MiniLM-L6-v2"
+
+datasets:
+  jobs:
+    input_filename: 'job_descriptions2.csv'
+    id_column: 'Job ID'
+    duplicate_subset: ['Job ID'] 
+    columns_to_process: 
+      - 'Job Description'
+      - 'Preferred Skills'
+      - 'Work Location 1'
+      - 'Minimum Qual Requirements'
+      - 'Business Title'
+      - 'Job Category'
+    qdrant_collection_name: "job_collection"
+    qdrant_payload_columns: ["Job ID", "Business Title", "Job Category"]
+
+  resumes:
+    input_filename: 'Resume.csv'
+    id_column: 'ID'
+    duplicate_subset: null
+    columns_to_process: ['Resume_str', 'Category']
+    qdrant_collection_name: "resume_collection"
+    qdrant_payload_columns: ["ID", "Category"]
+
+preprocessing:
+  train_data_file: "training_data.jsonl"
+  ner_label_key: "label"
+  chunksize: 50000
+  trainsize: 0.8
+
+training:
+  seed: 42
+  optimizer: "efficiency"
+
+qdrant:
+  url: "http://localhost:6333"
+  timeout: 60
+  batch_size: 1028
+
+evaluation:
+  top_k: 10
