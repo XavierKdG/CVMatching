@@ -46,7 +46,7 @@ class Preprocessor:
 
         processed_chunks = []
         try:
-            for chunk in pd.read_csv(input_path, chunksize=chunksize, low_memory=False):
+            for chunk in pd.read_csv(input_path, chunksize=chunksize, low_memory=False, encoding='utf-8'):
                 processed_df = self._process_dataframe(
                     df=chunk,
                     columns_to_combine=dataset_config["columns_to_process"],

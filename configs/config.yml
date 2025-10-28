@@ -1,5 +1,5 @@
 pipeline:
-  mode: 'custom'
+  mode: 'base'
 
 logging:
   file_name: "pipeline.log"
@@ -7,11 +7,12 @@ logging:
 paths:
   raw_folder: "data/raw"
   processed_folder: "data/processed"
+  silver_folder: "data/silver"
   models_folder: "models"
   spacy_config: "configs/spacy_config.cfg"
 
 models:
-  base_model: "en_core_web_sm"
+  base_model: "en_core_web_lg"
   similarity_model: "all-MiniLM-L6-v2"
 
 datasets:

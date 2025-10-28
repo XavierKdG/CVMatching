@@ -9,7 +9,7 @@ from spacy.cli.train import train as spacy_train
 from spacy.cli.convert import convert as spacy_convert
 from pathlib import Path
 from .utils import setup_logging, load_config #help functions
-import src.upload_to_qdrant as uploader
+from src.upload_to_qdrant import main as run_upload_pipeline
 
 class ModelTrainer:
     """Handles the spaCy NER model training pipeline."""
@@ -122,7 +122,7 @@ def main(config_path=None):
 
     logging.info("--- Proceeding to upload data to Qdrant ---")
     try:
-        uploader(config_path=config_path)
+        run_upload_pipeline(config_path=config_path)
     except Exception as e:
         logging.error(f"Failed to run Qdrant upload pipeline: {e}")
         raise

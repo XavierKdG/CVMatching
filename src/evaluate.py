@@ -1,94 +1,140 @@
-import os
-import argparse
+import spacy
 import pandas as pd
-import numpy as np
-import re
-from gensim.models.doc2vec import Doc2Vec
-from sklearn.metrics.pairwise import cosine_similarity
-from preprocess import TextPreprocessing
-import PyPDF2
-from sklearn.preprocessing import normalize
+import argparse
+import logging
+from pathlib import Path
+import json
+from .utils import setup_logging, load_config
 
-class ResumeEvaluator:
-    def __init__(self, model_path):
-        self.model = Doc2Vec.load(model_path)
-        self.preprocessor = TextPreprocessing(lemmatization=True)
-
-    def preprocess_text(self, text):
-        text = re.sub(r'[^a-zA-Z ]', ' ', text)
-        text = ' '.join(text.lower().split())
-        tokens = self.preprocessor.tokenize_and_stem(text)
-        return tokens
-
-    def infer_vector(self, text):
-        tokens = self.preprocess_text(text)
-        return self.model.infer_vector(tokens)
-
-    def read_pdf(self, pdf_path):
-        pdf = PyPDF2.PdfReader(pdf_path)
-        text = ""
-        for page in pdf.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text
-        return text
+def load_ner_model(config: dict):
+    """
+    Loads the correct NER model based on the pipeline mode in the config.
     
-def main():
-    parser = argparse.ArgumentParser(description="Evaluate CVs against Job Descriptions")
-    parser.add_argument("--model_path", type=str, required=True, help="Path to trained Doc2Vec model")
-    parser.add_argument("--data_path", type=str, required=True, help="Path to processed data folder")
-    args = parser.parse_args()
+    Args:
+        config: The loaded configuration dictionary.
+    
+    Returns:
+        A loaded spaCy nlp object, or None if loading fails.
+    """
+    pipeline_mode = config.get("pipeline", {}).get("mode", "base")
+    
+    if pipeline_mode == "custom":
+        model_path = Path(config["paths"]["models_folder"]) / "model-best"
+        logging.info(f"Loading CUSTOM model from: {model_path}")
+        if not model_path.exists():
+            logging.error(f"Custom model path not found: {model_path}")
+            logging.error("Please run the training pipeline first (src/train.py).")
+            return None
+        try:
+            nlp = spacy.load(model_path)
+            return nlp
+        except Exception as e:
+            logging.error(f"Failed to load custom model: {e}")
+            return None
+    else:
+        model_name = config["models"]["base_model"]
+        logging.info(f"Loading BASE model: {model_name}")
+        try:
+            nlp = spacy.load(model_name)
+            return nlp
+        except IOError:
+            logging.error(f"Failed to load base model '{model_name}'.")
+            logging.error(f"Try running: python -m spacy download {model_name}")
+            return None
+        except Exception as e:
+            logging.error(f"An error occurred loading base model: {e}")
+            return None
 
-    os.makedirs("results", exist_ok=True)
+def evaluate_dataset(nlp, parquet_path: Path, output_path: Path, text_column: str = "cleaned_text"):
+    """
+    Runs the nlp model over a parquet file and saves the found entities 
+    as a .jsonl "silver" annotation file.
+    
+    Args:
+        nlp: The loaded spaCy model.
+        parquet_path: Path to the input .parquet file.
+        output_path: Path to save the resulting .jsonl file.
+        text_column: The name of the column containing the text to process.
+    """
+    if not parquet_path.exists():
+        logging.warning(f"Input file not found, skipping: {parquet_path}")
+        return
 
-    jobs_path = os.path.join(args.data_path, "job_descriptions_processed.csv")
-    resumes_path = os.path.join(args.data_path, "resumes_processed.csv")
+    logging.info(f"Processing {parquet_path}...")
+    df = pd.read_parquet(parquet_path)
 
-    jobs_df = pd.read_csv(jobs_path)
-    resumes_df = pd.read_csv(resumes_path)
+    if text_column not in df.columns:
+        logging.error(f"'{text_column}' not found in {parquet_path}. Skipping.")
+        return
 
-    jobs_df['tokens'] = jobs_df['tokens'].apply(eval)
-    resumes_df['tokens'] = resumes_df['tokens'].apply(eval)
+    texts = df[text_column].astype(str).tolist()
+    
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    total_ents_found = 0
+    with open(output_path, 'w', encoding='utf-8') as f_out:
+        for doc in nlp.pipe(texts, batch_size=50):
+            entities = [[ent.start_char, ent.end_char, ent.label_] for ent in doc.ents]
+            
+            if entities:
+                total_ents_found += len(entities)
+    
+            record = {
+                "text": doc.text,
+                "label": entities 
+            }
+            f_out.write(json.dumps(record) + "\n")
 
-    evaluator = ResumeEvaluator(args.model_path)
+    logging.info(f"Finished processing. Found {total_ents_found} entities.")
+    logging.info(f"Silver annotations saved to: {output_path}")
 
-    jobs_vectors = []
-    for i in range(len(jobs_df)):
-        tag = f"job_{i}"
-        if tag in evaluator.model.dv:
-            jobs_vectors.append(evaluator.model.dv[tag])
-        else:
-            raise KeyError(f"Tag {tag} not found in model.dv")
-    jobs_vectors = normalize(np.stack(jobs_vectors))
+def main(config_path: str):
+    """
+    Main function to run the evaluation pipeline.
+    """
+    config = load_config(config_path)
+    setup_logging(config["logging"]["file_name"])
+    logging.info("--- Starting NER Silver Annotation Pipeline ---")
 
-    resumes_vectors = []
-    for i in range(len(resumes_df)):
-        tag = f"cv_{i}"
-        if tag in evaluator.model.dv:
-            resumes_vectors.append(evaluator.model.dv[tag])
-        else:
-            raise KeyError(f"Tag {tag} not found in model.dv")
-    resumes_vectors = normalize(np.stack(resumes_vectors))
+    nlp = load_ner_model(config)
+    if nlp is None:
+        logging.error("Failed to load NER model. Aborting.")
+        return
 
-    similarity_matrix = cosine_similarity(resumes_vectors, jobs_vectors)
-    similarity_matrix = ((similarity_matrix + 1) / 2) * 100
+    logging.info(f"Using model: {nlp.meta['name']} ({nlp.meta['version']})")
+    
+    processed_dir = Path(config["paths"]["processed_folder"])
+    silver_dir = Path(config["paths"]["silver_folder"])
 
+    try:
+        jobs_cfg = config["datasets"]["jobs"]
+        jobs_input_stem = Path(jobs_cfg["input_filename"]).stem
+        jobs_parquet_path = processed_dir / f"{jobs_input_stem}_processed.parquet"
+        jobs_silver_path = silver_dir / f"{jobs_input_stem}_silver.jsonl"
+        
+        evaluate_dataset(nlp, jobs_parquet_path, jobs_silver_path)
+    except KeyError:
+        logging.warning("Config for 'datasets.jobs' not found. Skipping jobs processing.")
+    except Exception as e:
+        logging.error(f"Error processing jobs dataset: {e}")
 
-    results = []
-    for i, resume_row in resumes_df.iterrows():
-        for j, job_row in jobs_df.iterrows():
-            results.append({
-                "Resume_ID": resume_row.get("ID", i),
-                "Resume_Category": resume_row.get("Category", ""),
-                "Job_ID": job_row.get("Job ID", j),
-                "Job_Category": job_row.get("Job Category", ""),
-                "Similarity_%": round(similarity_matrix[i, j], 2)
-            })
+    try:
+        resumes_cfg = config["datasets"]["resumes"]
+        resumes_input_stem = Path(resumes_cfg["input_filename"]).stem
+        resumes_parquet_path = processed_dir / f"{resumes_input_stem}_processed.parquet"
+        resumes_silver_path = silver_dir / f"{resumes_input_stem}_silver.jsonl"
 
-    results_df = pd.DataFrame(results)
-    results_file = os.path.join("results", "resume_job_similarity.csv")
-    results_df.to_csv(results_file, index=False)
-    print(f"Similarity results saved to {results_file}")
+        evaluate_dataset(nlp, resumes_parquet_path, resumes_silver_path)
+    except KeyError:
+        logging.warning("Config for 'datasets.resumes' not found. Skipping resumes processing.")
+    except Exception as e:
+        logging.error(f"Error processing resumes dataset: {e}")
+
+    logging.info("--- NER Silver Annotation Pipeline Complete ---")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Run NER model over processed data to create 'silver' annotations.")
+    parser.add_argument("--config", type=str, default="configs/config.yml", help="Path to the config.yml file")
+    args = parser.parse_args()
+    
+    main(config_path=args.config)
