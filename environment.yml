@@ -25,4 +25,4 @@ dependencies:
   - qdrant-client
   - gensim=4.3.3
   - pyyaml
-  - tf-keras
+  - PyPDF2

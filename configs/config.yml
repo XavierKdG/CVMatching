@@ -45,7 +45,7 @@ preprocessing:
 
 training:
   seed: 42
-  optimizer: "efficiency"
+  optimizer: "accuracy"
 
 qdrant:
   url: "http://localhost:6333"

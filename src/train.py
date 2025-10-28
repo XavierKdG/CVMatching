@@ -122,7 +122,7 @@ def main(config_path=None):
 
     logging.info("--- Proceeding to upload data to Qdrant ---")
     try:
-        uploader.main(config_path=config_path)
+        uploader(config_path=config_path)
     except Exception as e:
         logging.error(f"Failed to run Qdrant upload pipeline: {e}")
         raise
