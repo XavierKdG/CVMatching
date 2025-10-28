@@ -8,8 +8,11 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
+import pickle
+import os
 
-df = pd.read_csv("/home/admin-groep11/CVMatching-1/data/processed/labeled_jobdescriptions2_cleaned.csv")
+# --- Laad data ---
+df = pd.read_csv("data/processed/labeled_jobdescriptions2_cleaned.csv")
 
 X = df["job_text"]
 y = df["label"]
@@ -21,22 +24,18 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
 )
 
-
-from sklearn.feature_extraction.text import TfidfVectorizer
+# --- TF-IDF Vectorizer ---
 vectorizer = TfidfVectorizer(max_features=5000, stop_words="english", ngram_range=(1,2))
-
 X_train_tfidf = vectorizer.fit_transform(X_train)
 X_test_tfidf = vectorizer.transform(X_test)
 
-X_train_tfidf = vectorizer.transform(X_train)
-X_test_tfidf = vectorizer.transform(X_test)
-
+# --- Deep Learning Model ---
 model = Sequential([
     Dense(256, input_dim=X_train_tfidf.shape[1], activation='relu'),
     Dropout(0.5),
     Dense(128, activation='relu'),
     Dropout(0.5),
-    Dense(len(le.classes_), activation='softmax')  # aantal classes
+    Dense(len(le.classes_), activation='softmax')
 ])
 
 model.compile(
@@ -45,6 +44,7 @@ model.compile(
     metrics=['accuracy']
 )
 
+# --- Train model ---
 early_stop = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 history = model.fit(
     X_train_tfidf.toarray(),  
@@ -56,6 +56,7 @@ history = model.fit(
     verbose=2
 )
 
+# --- Model evaluatie ---
 y_pred_probs = model.predict(X_test_tfidf.toarray(), verbose=0)
 y_pred = np.argmax(y_pred_probs, axis=1)
 
@@ -74,11 +75,10 @@ print(f"F1-score:  {f1:.4f}")
 print(f"MSE:       {mse:.4f}")
 print(f"RMSE:      {rmse:.4f}")
 
+# --- Stap 2: Opslaan van model en preprocessing objects ---
+os.makedirs("files_chloe/models", exist_ok=True)
+model.save("files_chloe/models/deep_learning_model.h5")
+pickle.dump(vectorizer, open("files_chloe/models/tfidf_vectorizer.pkl", "wb"))
+pickle.dump(le, open("files_chloe/models/label_encoder.pkl", "wb"))
 
-# model.py
-from sklearn.ensemble import RandomForestClassifier
-
-def get_model():
-    # Hier kun je eventueel het model trainen als dat nog niet gedaan is
-    model = RandomForestClassifier()
-    return model
+print("\n✅ Model, vectorizer en label encoder succesvol opgeslagen in 'files_chloe/models/'")

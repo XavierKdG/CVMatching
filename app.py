@@ -1,63 +1,71 @@
+# app.py
 import streamlit as st
 import pandas as pd
-import os
-from files_chloe.tfidf_vectorizer import get_vectorizer
-from files_chloe.model import get_model
-from sklearn.metrics.pairwise import cosine_similarity
-import re
+import PyPDF2
+import numpy as np
+import pickle
+from tensorflow.keras.models import load_model
 
-# ======== Functie om tekst schoon te maken ========
-def clean_text(text):
-    text = str(text).lower()
-    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
-    return text
+st.set_page_config(page_title="CV Matching", layout="wide")
 
-# ======== Laad vectorizer, model en vacatures ========
-@st.cache_resource
-def load_resources():
-    vectorizer = get_vectorizer()
-    model = get_model()
-    jobs_path = os.path.join("data", "processed", "labeled_jobdescriptions2_cleaned.csv")
-    jobs = pd.read_csv(jobs_path)
-    jobs["job_text"] = jobs["job_text"].apply(clean_text)
-    return vectorizer, model, jobs
+# --- Functie: PDF uitlezen ---
+def extract_text_from_pdf(uploaded_file):
+    try:
+        reader = PyPDF2.PdfReader(uploaded_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        return text
+    except:
+        return ""
 
-vectorizer, model, jobs = load_resources()
+# --- Functie: Voorspelling ---
+def predict_cv_match(cv_text, model, vectorizer, le):
+    cv_tfidf = vectorizer.transform([cv_text])
+    pred_probs = model.predict(cv_tfidf.toarray(), verbose=0)
+    pred_class = np.argmax(pred_probs, axis=1)[0]
+    label = le.inverse_transform([pred_class])[0]
+    return label
 
-# ======== Streamlit UI ========
-st.title("CV–Vacature Matching Tool")
-st.write("Upload een CV-bestand om de beste match te vinden in de vacatures.")
+# --- Laad model en preprocessing objects ---
+@st.cache_resource(show_spinner=True)
+def load_model_and_objects():
+    model = load_model("files_chloe/models/deep_learning_model.h5")
+    vectorizer = pickle.load(open("files_chloe/models/tfidf_vectorizer.pkl", "rb"))
+    le = pickle.load(open("files_chloe/models/label_encoder.pkl", "rb"))
+    return model, vectorizer, le
 
-uploaded_file = st.file_uploader("Upload je CV (TXT of PDF)", type=["txt", "pdf"])
+model, vectorizer, le = load_model_and_objects()
 
-if uploaded_file is not None:
-    import io
-    from PyPDF2 import PdfReader
+# --- Vacatures laden ---
+df_jobs = pd.read_csv("data/processed/labeled_jobdescriptions2_cleaned.csv")
 
-    # CV tekst uitlezen
-    if uploaded_file.type == "application/pdf":
-        pdf = PdfReader(uploaded_file)
-        cv_text = "\n".join([page.extract_text() for page in pdf.pages])
+# --- Streamlit UI ---
+st.title("CV Matching met Deep Learning")
+
+uploaded_cv = st.file_uploader("Upload je CV (als PDF)", type=["pdf"])
+
+if uploaded_cv:
+    cv_text = extract_text_from_pdf(uploaded_cv)
+    if not cv_text.strip():
+        st.error("Kon geen tekst uit de PDF halen. Probeer een ander bestand.")
     else:
-        cv_text = uploaded_file.read().decode("utf-8")
+        if st.button("Check CV match"):
+            st.info("✅ CV ontvangen, voorspelling wordt uitgevoerd...")
 
-    cv_text = clean_text(cv_text)
-    st.subheader("CV Inhoud (eerste 500 tekens):")
-    st.write(cv_text[:500] + "...")
+            predicted_label = predict_cv_match(cv_text, model, vectorizer, le)
 
-    # Vectoriseer CV en vacatures
-    cv_vec = vectorizer.transform([cv_text])
-    job_vecs = vectorizer.transform(jobs["job_text"])
+            # --- Label 0 = geen match ---
+            if predicted_label == 0:
+                st.warning("❌ Geen match gevonden voor dit CV.")
+            else:
+                # Zoek vacatures met hetzelfde label
+                matching_jobs = df_jobs[df_jobs["label"] == predicted_label]
 
-    # Cosine similarity
-    sims = cosine_similarity(cv_vec, job_vecs)[0]
-    jobs["similarity"] = sims
-
-    # Top 5 matches
-    top_matches = jobs.sort_values(by="similarity", ascending=False).head(5)
-
-    st.subheader("Top 5 meest vergelijkbare vacatures:")
-    for i, row in top_matches.iterrows():
-        st.write(f"Score: {row['similarity']:.3f}")
-        st.write(row["job_text"][:300] + "...")
-        st.markdown("---")
+                if not matching_jobs.empty:
+                    st.success(f"✅ Match gevonden voor label '{predicted_label}'!")
+                    # Laat alleen kolommen zien die bestaan (voor nu: job_text)
+                    cols_to_show = [c for c in ["job_text"] if c in matching_jobs.columns]
+                    st.dataframe(matching_jobs[cols_to_show])
+                else:
+                    st.error("❌ Geen match gevonden voor dit CV.")
