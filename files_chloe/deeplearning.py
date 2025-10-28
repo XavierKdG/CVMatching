@@ -66,7 +66,6 @@ f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
 mse = mean_squared_error(y_test, y_pred)
 rmse = np.sqrt(mse)
 
-# === 10. Print resultaten ===
 print("\n=== Model Scores ===")
 print(f"Accuracy:  {accuracy:.4f}")
 print(f"Precision: {precision:.4f}")
@@ -76,3 +75,10 @@ print(f"MSE:       {mse:.4f}")
 print(f"RMSE:      {rmse:.4f}")
 
 
+# model.py
+from sklearn.ensemble import RandomForestClassifier
+
+def get_model():
+    # Hier kun je eventueel het model trainen als dat nog niet gedaan is
+    model = RandomForestClassifier()
+    return model
