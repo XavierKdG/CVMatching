@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from sklearn.preprocessing import normalize
 from logger import setup_logger
 
 # 1️⃣ Setup logger
@@ -35,9 +36,13 @@ def train_doc2vec(job_csv="./data/processed/job_descriptions2cleaned.csv",
     job_emb = np.array([model.dv[f'doc_{i}'] for i in range(len(job_docs))])
     resume_emb = np.array([model.dv[f'doc_{i}'] for i in range(len(job_docs), len(all_docs))])
 
+    # ✅ Normalize embeddings (important for cosine similarity)
+    job_emb = normalize(job_emb)
+    resume_emb = normalize(resume_emb)
+
     pd.DataFrame(job_emb).to_csv(job_output, index=False)
     pd.DataFrame(resume_emb).to_csv(resume_output, index=False)
-    logger.info(f"✅ Saved embeddings at:\n  {job_output}\n  {resume_output}")
+    logger.info(f"✅ Saved normalized embeddings at:\n  {job_output}\n  {resume_output}")
 
 if __name__ == "__main__":
     train_doc2vec()
