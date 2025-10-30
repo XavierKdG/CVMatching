@@ -111,17 +111,23 @@ rm miniconda.sh
 
 2. Create the Conda environment:
 
-`conda env create -f environment.yml`
+```
+conda env create -f environment.yml
+```
 
 3. Activate the environment:
 
-`conda activate cvmatching`
+```bash
+conda activate cvmatching
+```
 
 ### 4. Run Qdrant Database (via Docker)
 
 This still uses Docker, but only for the database.
 
-`docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant`
+```bash
+docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
+```
 
 Your Qdrant UI will be at `http://localhost:6334`.
 
@@ -163,12 +169,12 @@ By default, they all use `configs/config.yml`.
 
 If you want to run the pipeline with a different configuration (e.g., `configs/config1.yml`), you can run the following command:
 
-```python
+```bash
 python pipeline.py --config configs/config1.yml
 ```
 
 This also works for individual scripts:
-```python
+```bash
 python -m src.preprocess --config configs/config1.yml
 python -m src.train --config configs/config1.yml
 ```
