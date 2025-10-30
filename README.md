@@ -1,7 +1,7 @@
-## CVMatching
+# CVMatching
 Project Semester 5 - Groep **Weekend**
 
-### About The Project
+## About The Project
 CVMatching is a project where we use NLP to automatically analyze and match resumes with job descriptions. This repository contains the full pipeline, from data preprocessing and model training to a vector database and an interactive Streamlit application.
 
 The project consists of three main services managed by Docker:
@@ -11,7 +11,7 @@ The project consists of three main services managed by Docker:
 
 - **Doccano**: A data annotation tool used for creating NER training data.
 
-### Table of Contents
+## Table of Contents
 
 - [Recommended Setup (Docker-Compose)](#recommended-setup-docker-compose)
 
@@ -21,79 +21,93 @@ The project consists of three main services managed by Docker:
 
 - [Project Structure](#project-structure)
 
-### Recommended Setup (Docker-Compose)
+## Recommended Setup (Docker-Compose)
 
 This is the easiest and most reliable way to run the entire project. It will build the app and launch all three services (Streamlit, Qdrant, Doccano) at once.
 
-#### Prerequisites
+### Prerequisites
 
 - [Git](https://git-scm.com/install/)
-
 - [Docker](https://docs.docker.com/get-started/get-docker/) (Docker Desktop is recommended as it includes `docker-compose`).
 
-#### 1. Clone Repository
-`git clone https://github.com/XavierKdG/CVMatching.git`
+### 1. Clone Repository
+```bash
+git clone https://github.com/XavierKdG/CVMatching.git
+cd CVMatching
+```
 
-`cd CVMatching`
-
-#### 2. Add Dataset
+### 2. Add Dataset
 download the datasets below and place the it in the `data/raw/` directory
 
 - [Resume.csv](https://www.kaggle.com/datasets/014ce6313a60bf1563ff9ef3d57879bd8e7c1e1be0e8926bffb82d51ee85fda8?select=Resume.csv)
 
 - [job_descriptions2.csv](https://www.kaggle.com/datasets/014ce6313a60bf1563ff9ef3d57879bd8e7c1e1be0e8926bffb82d51ee85fda8?select=job_descriptions2.csv)
 
-#### 3. Build and Run All Services
+### 3. Build and Run All Services
 This command will build your custom Streamlit app image and start all three services. This may take several minutes on the first run.
 
-`docker-compose up --build`
+```bash
+docker-compose up --build
+```
 
-(Note: The configs/config.yml is already pre-configured to work with this Docker setup. The app will connect to http://qdrant:6333.)
+*(Note: The configs/config.yml is already pre-configured to work with this Docker setup. The app will connect to http://qdrant:6333.)*
 
-#### 4. Run the Data Pipeline (One-Time Setup)
-Your app is running, but the Qdrant database is empty. You must run your Python pipeline inside the app container to process your data and fill the database.
+### 4. Run the Data Pipeline (One-Time Setup)
+Your app is running, but the Qdrant database is **empty**. You must run your Python pipeline inside the app container to process your data and fill the database.
 
-1. Open a new, separate terminal (leave docker-compose up running).
+1. Open a **new, separate terminal** (leave `docker-compose up` running).
 
-2. Execute a shell inside the running app container:
+2. Execute a shell inside the running `app` container:
 
 3. You are now inside the container. Run your full pipeline:
+```bash
+python pipeline.py
+```
+This will run `preprocess.py`, `train.py`, and `upload_to_qdrant.py`, populating your Qdrant database.
 
-`python pipeline.py`
+### 5. Access Your Services
 
-This will run preprocess.py, train.py, and upload_to_qdrant.py, populating your Qdrant database.
+- Streamlit App: `http://localhost:8501`
 
-#### 5. Access Your Services
+- Doccano UI: `http://localhost:8000` (Login: `admin` / `password`)
 
-- Streamlit App: http://localhost:8501
+- Qdrant Web UI: `http://localhost:6334`
 
-- Doccano UI: http://localhost:8000 (Login: admin / password)
+### Stopping the Services
 
-- Qdrant Web UI: http://localhost:6334
+To stop all services, press `Ctrl+C` in the terminal where `docker-compose up` is running, or run this command from the project directory in another terminal:
 
-### Manual Setup (Local Development)
+```bash
+docker-compose down
+```
+
+## Manual Setup (Local Development)
 Follow these steps if you want to run the project locally without using docker-compose for the Streamlit app.
 
-#### 1. Clone Repository
-`git clone https://github.com/XavierKdG/CVMatching.git`
+### 1. Clone Repository
 
-`cd CVMatching`
+```bash
+git clone https://github.com/XavierKdG/CVMatching.git
+cd CVMatching
+```
 
-#### 2. Add Dataset
+### 2. Add Dataset
 download the datasets below and place the it in the `data/raw/` directory
 
 - [Resume.csv](https://www.kaggle.com/datasets/014ce6313a60bf1563ff9ef3d57879bd8e7c1e1be0e8926bffb82d51ee85fda8?select=Resume.csv)
 
 - [job_descriptions2.csv](https://www.kaggle.com/datasets/014ce6313a60bf1563ff9ef3d57879bd8e7c1e1be0e8926bffb82d51ee85fda8?select=job_descriptions2.csv)
 
-#### 3. Install Conda Environment
+### 3. Install Conda Environment
 
 1. Install Miniconda:
 
-`curl -o miniconda.sh [https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh](https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh)`
-`bash miniconda.sh`
-`source ~/.bashrc`
-`rm miniconda.sh`
+```bash
+curl -o miniconda.sh [https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh](https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh)
+bash miniconda.sh
+source ~/.bashrc
+rm miniconda.sh
+```
 
 2. Create the Conda environment:
 
@@ -103,15 +117,15 @@ download the datasets below and place the it in the `data/raw/` directory
 
 `conda activate cvmatching`
 
-#### 4. Run Qdrant Database (via Docker)
+### 4. Run Qdrant Database (via Docker)
 
 This still uses Docker, but only for the database.
 
 `docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant`
 
-Your Qdrant UI will be at http://localhost:6334.
+Your Qdrant UI will be at `http://localhost:6334`.
 
-#### 5. Configure for Localhost
+### 5. Configure for Localhost
 
 For this manual setup, you must change the config file.
 
@@ -119,24 +133,29 @@ For this manual setup, you must change the config file.
 
 2. Ensure the `url` points to `localhost`:
 
-`qdrant:`
-  `url: "http://localhost:6333" # <-- Use localhost for this setup`
+```yml
+qdrant:
+  url: "http://localhost:6333" # <-- Use localhost for this setup
+```
 
-#### 6. Run the Data Pipeline
+### 6. Run the Data Pipeline
 In your terminal (with the cvmatching env active), run the full pipeline to populate Qdrant:
 
-`python pipeline.py`
+```bash
+python pipeline.py
+```
 
-#### 7. Run the Streamlit App
+### 7. Run the Streamlit App
 
 Finally, launch the app:
-
-`streamlit run app.py`
+```bash
+streamlit run app.py
+```
 
 Your Streamlit app will be at `http://localhost:8501`.
 
 
-### Advanced Usage & Configuration
+## Advanced Usage & Configuration
 
 All the main Python scripts (`pipeline.py`, `preprocess.py`, `train.py`, `upload_to_qdrant.py`) accept a `--config` argument to specify which configuration file to use.
 
@@ -144,14 +163,18 @@ By default, they all use `configs/config.yml`.
 
 If you want to run the pipeline with a different configuration (e.g., `configs/config1.yml`), you can run the following command:
 
-`python pipeline.py --config configs/config1.yml`
+```python
+python pipeline.py --config configs/config1.yml
+```
 
 This also works for individual scripts:
+```python
+python -m src.preprocess --config configs/config1.yml
+python -m src.train --config configs/config1.yml
+```
 
-`python -m src.preprocess --config configs/config1.yml`
-`python -m src.train --config configs/config1.yml`
-
-### Project Structure
+## Project Structure
+```
 .
 ├── app.py              # The Streamlit UI script
 ├── configs/            # All configuration files
@@ -178,3 +201,4 @@ This also works for individual scripts:
 ├── environment.yml     # Lists all Conda/Pip dependencies
 ├── pipeline.py         # Main script to run all data processes
 └── README.md           # This file
+```
