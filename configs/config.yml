@@ -1,19 +1,18 @@
 pipeline:
-  mode: 'base'
+  mode: 'base' # 'base' or 'custom' 
 
 logging:
-  file_name: "pipeline.log"
+  file_name: "pipeline.log" # custom log file name
 
 paths:
   raw_folder: "data/raw"
   processed_folder: "data/processed"
-  silver_folder: "data/silver"
   models_folder: "models"
   spacy_config: "configs/spacy_config.cfg"
 
 models:
-  base_model: "en_core_web_lg"
-  similarity_model: "all-MiniLM-L6-v2"
+  base_model: "en_core_web_lg" # "en_core_web_sm", "en_core_web_md", "en_core_web_lg" (different sizes)
+  similarity_model: "all-MiniLM-L6-v2" # "all-MiniLM-L6-v2", "all-mpnet-base-v2", etc.
 
 datasets:
   jobs:
@@ -28,7 +27,7 @@ datasets:
       - 'Business Title'
       - 'Job Category'
     qdrant_collection_name: "job_collection"
-    qdrant_payload_columns: ["Job ID", "Business Title", "Job Category"]
+    qdrant_payload_columns: ["Job ID", "Business Title", "Job Category", "cleaned_text", "Work Location 1", "Hours/Shift"]
 
   resumes:
     input_filename: 'Resume.csv'
@@ -36,22 +35,116 @@ datasets:
     duplicate_subset: null
     columns_to_process: ['Resume_str', 'Category']
     qdrant_collection_name: "resume_collection"
-    qdrant_payload_columns: ["ID", "Category"]
+    qdrant_payload_columns: ["ID", "Category", "cleaned_text"]
 
 preprocessing:
-  train_data_file: "training_data.jsonl"
-  ner_label_key: "label"
+  train_data_file: "training_data.jsonl" # File to store NER training data
+  ner_label_key: "label" # Key in training data for NER labels
   chunksize: 50000
-  trainsize: 0.8
+  trainsize: 0.8 # train/dev split
 
 training:
   seed: 42
-  optimizer: "accuracy"
+  optimizer: "accuracy" # "accuracy" or "efficiency"
 
 qdrant:
   url: "http://localhost:6333"
   timeout: 60
-  batch_size: 1028
+  batch_size: 1028 # Number of vectors to send in each batch
 
 evaluation:
-  top_k: 10
+  weights:
+    semantic: 0.6 # Weight for semantic similarity
+    keyword: 0.4 # Weight for keyword matching
+  
+  standalone_regex_skills: # Skills to match as whole words only
+    - 'r'
+    - 'ai'
+    - 'go'
+    - 'pos'
+    - 'sem'
+    - 'git'
+
+  hard_skill_keywords: # List of hard skill keywords to look for
+    # Data Science
+    - 'python'
+    - 'r'
+    - 'sql'
+    - 'data analysis'
+    - 'data science'
+    - 'machine learning' 
+    - 'pandas'
+    - 'numpy'
+    - 'scikit-learn'
+    - 'statistics'
+    - 'etl'
+    - 'ai'
+    # BI Tools
+    - 'excel'
+    - 'power bi'
+    - 'tableau' 
+    # Big Data & Engineering
+    - 'spark'
+    - 'hadoop'
+    - 'big data'
+    - 'data warehousing'
+    # Development & DevOps
+    - 'java'
+    - 'c#'
+    - '.net'
+    - 'node.js'
+    - 'php'
+    - 'ruby'
+    - 'go'
+    - 'rust'
+    - 'api'
+    - 'rest api'
+    - 'graphql'
+    - 'scala'
+    - 'kotlin'
+    - 'c++'
+    - 'react'
+    - 'javascript'
+    - 'typescript'
+    - 'angular'
+    - 'vue'
+    - 'html'
+    - 'css'
+    - 'aws'
+    - 'azure'
+    - 'google cloud'
+    - 'gcp'
+    - 'docker'
+    - 'kubernetes'
+    - 'k8s'
+    - 'terraform'
+    - 'ci/cd'
+    - 'devops'
+    - 'jenkins'
+    - 'ansible'
+    - 'linux'
+    - 'git'
+    # Marketing & Sales Tech
+    - 'seo'
+    - 'sem'
+    - 'ppc'
+    - 'google analytics'
+    - 'hubspot'
+    - 'salesforce'
+    - 'crm'
+    # Design Tech
+    - 'figma'
+    - 'sketch'
+    - 'adobe xd'
+    # Project Management Tech
+    - 'agile'
+    - 'scrum'
+    - 'kanban'
+    - 'jira'
+    - 'prince2'
+    # Retail & Service Skills
+    - 'customer service'
+    - 'cash handling'
+    - 'point of sale'
+    - 'pos'
+    - 'retail'
