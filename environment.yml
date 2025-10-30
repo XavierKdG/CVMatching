@@ -26,4 +26,4 @@ dependencies:
   - gensim=4.3.3
   - pyyaml
   - PyPDF2
-  - doccano-client
+  - doccano
