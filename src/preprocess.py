@@ -1,30 +1,23 @@
 import pandas as pd
-import os 
+import os
 import re
 import html
-from sklearn.model_selection import train_test_split
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
+import torch
+from transformers import BertTokenizer, BertModel
+import numpy as np
 
-# nltk.download('punkt')      
-# nltk.download('wordnet')    
-# nltk.download('omw-1.4') 
-# nltk.download('averaged_perceptron_tagger')
-# nltk.download('stopwords')
-
+# Create folders if they don’t exist
 os.makedirs('data/processed', exist_ok=True)
 os.makedirs('data/raw', exist_ok=True)
 
-def load_raw_csv(file_path):
-    return pd.read_csv(file_path)
-
+# ----------------------
+# TEXT CLEANING
+# ----------------------
 def clean_text(text):
     if pd.isna(text):
-        return []
+        return ""
     
-    # 1. Fix encoding issues (like â€™ to ’)
+    # 1. Fix encoding issues
     text = text.encode("latin1", "ignore").decode("utf-8", "ignore")
     text = html.unescape(text)
 
@@ -38,30 +31,64 @@ def clean_text(text):
     text = re.sub(r"[^a-zA-Z0-9 ]", " ", text)
 
     # 5. Lowercase
-    text = text.lower().strip()
+    return text.lower().strip()
 
-    # --- Tokenization ---
-    tokens = word_tokenize(text)
 
-    # 6. Remove stopwords
-    stop_words = set(stopwords.words("english"))
-    tokens = [w for w in tokens if w not in stop_words]
+# ----------------------
+# LOAD BERT MODEL
+# ----------------------
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
-    # 7. Lemmatization
-    lemmatizer = WordNetLemmatizer()
-    tokens = [lemmatizer.lemmatize(w) for w in tokens]
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+model = BertModel.from_pretrained("bert-base-uncased").to(device)
 
-    return tokens   # return list instead of string
 
+# ----------------------
+# BATCH EMBEDDING FUNCTION
+# ----------------------
+def get_embeddings_batch(texts, batch_size=32, max_length=128):
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]
+
+        # Tokenize batch
+        inputs = tokenizer(batch_texts, return_tensors="pt", truncation=True,
+                           padding=True, max_length=max_length).to(device)
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+        # CLS token embedding
+        cls_embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+        all_embeddings.extend(cls_embeddings)
+
+    print(f"Processed batch {i // batch_size + 1}")
+    
+    return np.array(all_embeddings)
+
+
+# ----------------------
+# MAIN PIPELINE
+# ----------------------
 def main():
-    # df1 = pd.read_csv("./data/raw/job_descriptions.csv")
+    # Load raw dataset
     df2 = pd.read_csv("./data/raw/job_descriptions2.csv")
 
-    # df1['Job Description'] = df1['Job Description'].apply(clean_text)
+    # Step 1: Clean text
     df2['Job Description'] = df2['Job Description'].apply(clean_text)
-    
-    # df1.to_csv('./data/processed/processed_df1.csv', index=False)
+
+    # Step 2: BERT embeddings
+    texts = df2['Job Description'].tolist()
+    embeddings = get_embeddings_batch(texts, batch_size=32)
+
+    # Step 3: Save embeddings
+    df2['BERT_Embeddings'] = embeddings.tolist()  # list for CSV readability
+
+    df2.to_pickle('./data/processed/processed_df2_with_embeddings.pkl')  # preserves NumPy arrays
     df2.to_csv('./data/processed/processed_df2.csv', index=False)
+
+    print("✅ Processing complete! Saved to data/processed/")
 
 if __name__ == "__main__":
     main()
