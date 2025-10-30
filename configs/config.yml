@@ -48,7 +48,7 @@ training:
   optimizer: "accuracy" # "accuracy" or "efficiency"
 
 qdrant:
-  url: "http://localhost:6333"
+  url: "http://qdrant:6333"
   timeout: 60
   batch_size: 1028 # Number of vectors to send in each batch
 

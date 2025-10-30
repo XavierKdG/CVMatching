@@ -18,7 +18,7 @@ class Preprocessor:
         self.processed_dir = config["paths"]["processed_folder"]
 
         base_model = self.config["models"]["base_model"] 
-        disabled_pipes = ["parser", "ner"] #not needed for this task
+        disabled_pipes = ["parser"] #not needed for this task
         logging.info(f"Loading spaCy model for lemmatization: {base_model}")
         self.similarity_nlp = spacy.load(base_model, disable=disabled_pipes) #load nlp model
 
@@ -126,6 +126,7 @@ class Preprocessor:
             )
         else:
             logging.error("Failed to load NER data. Skipping .spacy corpus creation.")
+            raise ValueError(f"NER data file is empty or invalid: {ner_data_path}")
         logging.info("--- NER Corpus Creation Complete ---")
 
     def _load_ner_data(self, jsonl_path):
@@ -146,10 +147,11 @@ class Preprocessor:
             return data
         except FileNotFoundError:
             logging.error(f"NER data file not found: {jsonl_path}")
-            return []
+            logging.error("To run in 'custom' mode, this file is required.")
+            raise
         except Exception as e:
             logging.error(f"Error loading {jsonl_path}: {e}")
-            return []
+            raise
 
     def _create_spacy_corpus(self, data, train_path, dev_path, train_ratio, seed):
         """Internal: Splits data and creates .spacy files."""
@@ -190,7 +192,6 @@ def main(config_path=None):
         config_path = "configs/config.yml" 
         
     config = load_config(config_path) 
-    setup_logging(config["logging"]["file_name"])
 
     preprocessor = Preprocessor(config) #Initialize the general preprocessor
     preprocessor.run_similarity_preprocessing() #CSV to Parquet
@@ -202,5 +203,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/config.yml", help="Path to the config.yml file")
     args = parser.parse_args()
+
+    config = load_config(args.config) 
+    setup_logging(config["logging"]["file_name"])
     
     main(config_path=args.config)
