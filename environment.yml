@@ -15,8 +15,6 @@ dependencies:
   - flask
   - nltk
   - pip
-  - spacy-model-en_core_web_sm
-  - spacy-model-en_core_web_lg
   - ipython<9 
   - jupyter
   - spacy
@@ -26,4 +24,5 @@ dependencies:
   - gensim=4.3.3
   - pyyaml
   - PyPDF2
-  - doccano
+  - pip:
+    - doccano
