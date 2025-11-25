@@ -26,7 +26,7 @@ __pycache__/
 models/
 
 # ignore Jupyter Notebook files
-*.ipynb
+# *.ipynb
 
 # ignore log files
 *.log
