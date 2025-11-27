@@ -1,7 +1,9 @@
 import pandas as pd
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import SentenceTransformer, util, InputExample
+import torch
 import logging
 import os
+import random
 
 # -----------------------------#
 # Logging setup
@@ -41,12 +43,18 @@ logging.info("Computing cosine similarities...")
 similarity_matrix = util.cos_sim(job_embeddings, resume_embeddings)
 
 # -----------------------------#
-# Find best matching resume per job
+# Generate best matches + semi-hard negatives
 # -----------------------------#
 results = []
+examples = []  # for additional fine-tuning
+
 for i in range(len(jobs)):
+    job_text = jobs.loc[i, "Job Description"]
+
+    # Positive pair (best match)
     best_idx = int(similarity_matrix[i].argmax().item())
     best_score = float(similarity_matrix[i][best_idx].item())
+    best_resume = resumes.loc[best_idx, "Resume_str"]
 
     results.append({
         "Job_Index": i,
@@ -58,14 +66,45 @@ for i in range(len(jobs)):
         "Model": "MiniLM_finetuned_LoRA"
     })
 
+    # Add positive example
+    examples.append(InputExample(texts=[str(job_text), str(best_resume)], label=1.0))
+
+    neg_resume = None
+    # Hard negative: moderately similar but incorrect
+    sorted_idx = torch.argsort(similarity_matrix[i], descending=True)
+    found_neg = False
+    for neg_idx in sorted_idx[1:10]:  # check top 10 non-best matches
+        neg_score = float(similarity_matrix[i][neg_idx])
+        if 0.1 <= neg_score <= 0.5:  # moderately similar
+            neg_resume = resumes.loc[int(neg_idx), "Resume_str"]
+            examples.append(InputExample(texts=[str(job_text), str(neg_resume)], label=0.0))
+            found_neg = True
+            break
+
+    
+    # Fallback: random negative if no suitable one found
+    if not found_neg:
+        rand_idx = random.randint(0, len(resumes) - 1)
+        rand_resume = resumes.loc[rand_idx, "Resume_str"]
+        examples.append(InputExample(texts=[str(job_text), str(neg_resume)], label=0.0))
+
+
 # -----------------------------#
-# Save results
+# Save matching results
 # -----------------------------#
 results_df = pd.DataFrame(results)
-output_path = "./data/processed/minilm_finetuned_matches.csv"
-os.makedirs(os.path.dirname(output_path), exist_ok=True)
-results_df.to_csv(output_path, index=False)
+output_csv = "./data/processed/minilm_finetuned_matches.csv"
+os.makedirs(os.path.dirname(output_csv), exist_ok=True)
+results_df.to_csv(output_csv, index=False)
 
 avg_sim = results_df["Similarity"].mean()
-logging.info(f"✅ Saved fine-tuned MiniLM match results to: {output_path}")
+logging.info(f"✅ Saved fine-tuned MiniLM match results to: {output_csv}")
 logging.info(f"✅ Average best-match similarity: {avg_sim:.4f}")
+
+# -----------------------------#
+# Save fine-tuned model
+# -----------------------------#
+save_model_path = "./models/minilm_finetuned_lora_final"
+os.makedirs(save_model_path, exist_ok=True)
+model.save(save_model_path)
+logging.info(f"✅ Fine-tuned MiniLM model saved at: {save_model_path}")
