@@ -1,6 +1,7 @@
 ### Step by step documentation for preprocessing.
 
 - Remove unnecessary columns:
+#### Job descriptions
 ```
 Not needed for our case:
 - Job ID
@@ -9,7 +10,7 @@ Not needed for our case:
 - Title Code No
 - Level
 - Job Category: 0,1,2," "
-- Full-Time/Part-Time Indicator
+- Full-Time/Part-Time indicator
 - Division/Work Unit
 - Additional Information
 - To Apply
@@ -27,6 +28,13 @@ Too hard to work with:
 - Work Location
 - Hours/Shift
 - Residency Requirement (for now, feature engineering needed)
+```
+
+#### Resume
+```
+Not needed for our case:
+- ID
+- Resume_html
 ```
 
 - Remove duplicate rows
