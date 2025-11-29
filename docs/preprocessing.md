@@ -33,7 +33,7 @@ Too hard to work with:
 because, unnecessary and over fits the model on the same data. "thinks its more important, because it occurs more often"
 
 - Remove HTML/XML tags:
-because, other wise we get tokens like "b" from tags like (<b>). we dont want extra noise
+because, other wise we get tokens like "b" from tags like (`<b>`). we dont want extra noise
 
 - Remove websites or links
 because, increases noise for the model and is not necessary for our case
