@@ -7,6 +7,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset
+import pandas as pd
+
+
+def collate_fn(batch):
+    noised_batch, original_batch = zip(*batch)  # unpack tuples
+    return list(noised_batch), list(original_batch)
 
 # Helper class om per index een (noised_sentence, original_sentence) paar te leveren
 class TextPairsDataset(Dataset):
@@ -34,7 +40,7 @@ class TextPairsDataset(Dataset):
 # het doel van dit is om de sentence transformer model te trainen, de weights van het model worden getrained.
 # op basis van de toegevoegde ruis aan de originele documenten.
 class TSDAETrainer:
-    def __init__(self, model_name, batch_size=16, lr=1e-5, epochs=3, save_dir="./tsdae_model"):
+    def __init__(self, model_name, batch_size, lr, epochs, save_dir="./models/tsdae_model"):
         
         # 1. Load encoder
         self.encoder = SentenceTransformer(model_name) 
@@ -96,6 +102,7 @@ class TSDAETrainer:
                     
                 noised_docs.append(" ".join(tokens_shuffled))
 
+            print("ruis toegevoegd aan documenten.")
             return noised_docs
 
         # het trainen van het model met de originele documenten en toegevoegde ruis.
@@ -115,32 +122,52 @@ class TSDAETrainer:
                     dataset = tsdae_dataset,
                     batch_size=self.batch_size,
                     shuffle=True,           # shuffle tijdens training
-                    drop_last=True,         # laatste batch droppen als die kleiner is dan batch_size
+                    drop_last=True,        # laatste batch droppen als die kleiner is dan batch_size
                 )
 
             optimizer = torch.optim.Adam(self.encoder.parameters(), lr=self.lr)
             for epoch in range (self.epochs):
                 for noised_batch, original_batch in dataloader:
                     # reset gradients
-                    optimizer.zero_grad()
+                    optimizer.zero_grad()               
                     # verkregen embeddings van de noised zinnen
-                    reconstructed_embeddings : torch.Tensor = self.encoder(noised_batch)  
-                    # target embeddings van originele zinnen
+                    noised_inputs = self.encoder.tokenizer(
+                        noised_batch,
+                        padding=True,
+                        truncation=True,
+                        return_tensors="pt"
+                    )
+                    original_inputs = self.encoder.tokenizer(
+                        original_batch,
+                        padding=True,
+                        truncation=True,
+                        return_tensors="pt"
+                    )
+
+                    # embeddings van noised zinnen (trainable)
+                    noised_inputs = {k: v.to(self.device) for k, v in noised_inputs.items()}
+                    original_inputs = {k: v.to(self.device) for k, v in original_inputs.items()}
+
+                    # 2. Forward pass
+                    reconstructed_embeddings = self.encoder.forward(input = noised_inputs)['sentence_embedding']
                     with torch.no_grad():
-                        target_embeddings : torch.Tensor = self.encoder(original_batch)
+                        target_embeddings = self.encoder.forward(input = original_inputs)['sentence_embedding']
                     #bereken loss op basis van cosine similarity    
                     loss = 1 - F.cosine_similarity(reconstructed_embeddings, target_embeddings, dim=1).mean()
                     #backpropogation
                     loss.backward()
                     #update weights
                     optimizer.step()
+                    print("epoch1")
 
             self.encoder.save(self.save_dir)
             print(f"Model succesvol opgeslagen op: {self.save_dir}")
 
 if __name__ == "__main__":
-    
-    trainer = TSDAETrainer(model_name="all-MiniLM-L6-v2", batch_size=16, lr=1e-5, epochs=3, save_dir="./tsdae_model")
+    dataset = pd.read_csv("./data/raw/job_descriptions2.csv")
+    original_docs = dataset['Job Description'].tolist()
+    trainer = TSDAETrainer(model_name="all-MiniLM-L6-v2", batch_size=8, lr=1e-5, epochs=1, save_dir="./models/tsdae_model")
+    trainer.train(original_docs, noise_level=0.1)
 
 
 
@@ -148,5 +175,4 @@ if __name__ == "__main__":
 
 
 
-  
 
