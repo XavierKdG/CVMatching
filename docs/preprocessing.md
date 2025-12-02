@@ -4,7 +4,6 @@
 #### Job descriptions
 ```
 Not needed for our case:
-- Job ID
 - Posting Type
 - # Of Positions
 - Title Code No
@@ -33,7 +32,6 @@ Too hard to work with:
 #### Resume
 ```
 Not needed for our case:
-- ID
 - Resume_html
 ```
 

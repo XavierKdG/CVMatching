@@ -1,5 +1,5 @@
 job_description:
-  columns_to_remove: [Job ID, Posting Type, "# Of Positions", Title Code No, Level, Full-Time/Part-Time indicator, Division/Work Unit, Additional Information, To Apply, Work Location 1, Recruitment Contact, Posting Date, Post Until, Posting Updated, Process Date, Salary Range From, Salary Range To, Salary Frequency, Work Location, Hours/Shift, Residency Requirement]
+  columns_to_remove: [Posting Type, "# Of Positions", Title Code No, Level, Full-Time/Part-Time indicator, Division/Work Unit, Additional Information, To Apply, Work Location 1, Recruitment Contact, Posting Date, Post Until, Posting Updated, Process Date, Salary Range From, Salary Range To, Salary Frequency, Work Location, Hours/Shift, Residency Requirement]
 
 resume:
-  columns_to_remove: [ID, Resume_html]
+  columns_to_remove: [Resume_html]
