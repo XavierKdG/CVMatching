@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset
 import pandas as pd
-
+from utils import *
 
 def collate_fn(batch):
     noised_batch, original_batch = zip(*batch)  # unpack tuples
@@ -52,6 +52,10 @@ class TSDAETrainer:
         self.lr = lr
         self.epochs = epochs
         self.save_dir = save_dir
+        self.teacher = SentenceTransformer(model_name)
+        self.teacher.eval()
+        for p in self.teacher.parameters():
+            p.requires_grad = False
 
         # 3. Device (GPU or CPU)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -106,68 +110,72 @@ class TSDAETrainer:
             return noised_docs
 
         # het trainen van het model met de originele documenten en toegevoegde ruis.
-    def train(self, original_doc: list[str], noise_level: float = 0.1) -> None:
-            """
-            Train TSDAE model met de originele documenten en toegevoegde ruis.
-            """
-            # maak kopie van originele documenten
-            original_doc2 : List[str]= original_doc.copy()
-            # voeg ruis toe aan de originele documenten
-            noised_docs : List[str]  = self.add_noise(original_doc, noise_level)
+    def train(self, original_docs: list[str], noise_level: float = 0.1):
+        """
+        Train TSDAE model using original documents + noisy versions.
+        No logging or printing.
+        """
 
-            # een tuple van [str,str]
-            tsdae_dataset : TextPairsDataset= TextPairsDataset(noised_docs=noised_docs, original_docs=original_doc2)
+        # 1. Copy clean docs and create noised docs
+        clean_docs = original_docs.copy()
+        noised_docs = self.add_noise(clean_docs, noise_level)
 
-            dataloader = DataLoader(
-                    dataset = tsdae_dataset,
-                    batch_size=self.batch_size,
-                    shuffle=True,           # shuffle tijdens training
-                    drop_last=True,        # laatste batch droppen als die kleiner is dan batch_size
-                )
+        # 2. Build dataset
+        dataset = TextPairsDataset(noised_docs=noised_docs, original_docs=clean_docs)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=True
+        )
 
-            optimizer = torch.optim.Adam(self.encoder.parameters(), lr=self.lr)
-            for epoch in range (self.epochs):
-                for noised_batch, original_batch in dataloader:
-                    # reset gradients
-                    optimizer.zero_grad()               
-                    # verkregen embeddings van de noised zinnen
-                    noised_inputs = self.encoder.tokenizer(
-                        noised_batch,
-                        padding=True,
-                        truncation=True,
-                        return_tensors="pt"
-                    )
-                    original_inputs = self.encoder.tokenizer(
-                        original_batch,
-                        padding=True,
-                        truncation=True,
-                        return_tensors="pt"
-                    )
+        optimizer = torch.optim.Adam(self.encoder.parameters(), lr=self.lr)
 
-                    # embeddings van noised zinnen (trainable)
-                    noised_inputs = {k: v.to(self.device) for k, v in noised_inputs.items()}
-                    original_inputs = {k: v.to(self.device) for k, v in original_inputs.items()}
+        # Teacher should *not* get gradients
+        for param in self.teacher.parameters():
+            param.requires_grad = False
 
-                    # 2. Forward pass
-                    reconstructed_embeddings = self.encoder.forward(input = noised_inputs)['sentence_embedding']
-                    with torch.no_grad():
-                        target_embeddings = self.encoder.forward(input = original_inputs)['sentence_embedding']
-                    #bereken loss op basis van cosine similarity    
-                    loss = 1 - F.cosine_similarity(reconstructed_embeddings, target_embeddings, dim=1).mean()
-                    #backpropogation
-                    loss.backward()
-                    #update weights
-                    optimizer.step()
-                    print("epoch1")
+        # 3. Training loop
+        for epoch in range(self.epochs):
+            for noised_batch, clean_batch in dataloader:
 
+                optimizer.zero_grad()
+
+                # ---- Tokenize batches manually ----
+                noised_inputs = self.encoder.tokenize(noised_batch)
+                noised_inputs = {k: v.to(self.device) for k, v in noised_inputs.items()}
+
+                clean_inputs = self.encoder.tokenize(clean_batch)
+                clean_inputs = {k: v.to(self.device) for k, v in clean_inputs.items()}
+
+                # ---- Student forward pass (with grad) ----
+                student_out = self.encoder(noised_inputs)
+                recon_embeddings = student_out["sentence_embedding"]
+
+                # ---- Teacher forward pass (no grad) ----
+                with torch.no_grad():
+                    teacher_out = self.teacher(clean_inputs)
+                    target_embeddings = teacher_out["sentence_embedding"]
+
+                # ---- Compute loss ----
+                loss = 1 - F.cosine_similarity(recon_embeddings, target_embeddings, dim=1).mean()
+
+                # ---- Backprop ----
+                loss.backward()
+                optimizer.step()
+                print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {loss.item():.4f}")
+
+                # 4. Save model
             self.encoder.save(self.save_dir)
             print(f"Model succesvol opgeslagen op: {self.save_dir}")
 
 if __name__ == "__main__":
-    dataset = pd.read_csv("./data/raw/job_descriptions2.csv")
+    setup_logging("tsdae_fine_tuning.log")
+
+    dataset = pd.read_csv("./data/processed/job_descriptions2_cleaned.csv")
     original_docs = dataset['Job Description'].tolist()
-    trainer = TSDAETrainer(model_name="all-MiniLM-L6-v2", batch_size=8, lr=1e-5, epochs=1, save_dir="./models/tsdae_model")
-    trainer.train(original_docs, noise_level=0.1)
+    trainer = TSDAETrainer(model_name="all-MiniLM-L6-v2", batch_size=16, lr=1e-5, epochs=2, save_dir="./models/tsdae_model3")
+    trainer.train(original_docs, noise_level=0.3)
 
 
 
