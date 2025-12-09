@@ -42,8 +42,8 @@ def calinski_harabasz_scores(embedding_matrix: np.ndarray):
     score = sklearn.metrics.calinski_harabasz_score(embedding_matrix,labels)
     return score
 
-jobs_df = pd.read_csv("/data/raw/job_descriptions2.csv")   # columns: job_id, job_text
-cvs_df  = pd.read_csv("/data/raw/Resume.csv")    # columns: cv_id, cv_text
+jobs_df = pd.read_csv("/cleaned/processed/job_descriptions2_cleaned.csv")   # columns: job_id, job_text
+cvs_df  = pd.read_csv("/data/processed/Resume_cleaned.csv")    # columns: cv_id, cv_text
 
 queries = dict(zip(jobs_df.job_id.astype(str), jobs_df.job_text))
 corpus  = dict(zip(cvs_df.cv_id.astype(str), cvs_df.cv_text))
@@ -51,7 +51,8 @@ corpus  = dict(zip(cvs_df.cv_id.astype(str), cvs_df.cv_text))
 job_texts = jobs_df["Job Description"].tolist()
 cv_texts  = cvs_df["Resume_str"].tolist()
 
-baseline_model=SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')  
+model_path = "./models/tsdae_model3"
+baseline_model=tsdae_model = SentenceTransformer(model_path)
 
 job_emb = baseline_model.encode(
     job_texts,
@@ -74,6 +75,6 @@ best_5 = util.semantic_search(job_emb_t, cv_emb_t, top_k=5)
 
 result = np.vstack([job_emb, cv_emb])
 
-evaluate_score1 = silhouette_scores(result, job_emb, cv_emb)
+evaluate_score1 = silhouette_scores(result)
 print("Silhouette Score:", evaluate_score1)
 
