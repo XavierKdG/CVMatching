@@ -42,39 +42,32 @@ def calinski_harabasz_scores(embedding_matrix: np.ndarray):
     score = sklearn.metrics.calinski_harabasz_score(embedding_matrix,labels)
     return score
 
-jobs_df = pd.read_csv("/cleaned/processed/job_descriptions2_cleaned.csv")   # columns: job_id, job_text
-cvs_df  = pd.read_csv("/data/processed/Resume_cleaned.csv")    # columns: cv_id, cv_text
+jobs_df = pd.read_csv("./data/processed/job_descriptions2_cleaned.csv")   # columns: job_id, job_text
+cvs_df  = pd.read_csv("./data/processed/Resume_cleaned.csv")    # columns: cv_id, cv_text
 
-queries = dict(zip(jobs_df.job_id.astype(str), jobs_df.job_text))
-corpus  = dict(zip(cvs_df.cv_id.astype(str), cvs_df.cv_text))
+#queries = dict(zip(jobs_df.job_id.astype(str), jobs_df.job_text))
+#corpus  = dict(zip(cvs_df.cv_id.astype(str), cvs_df.cv_text))
 
 job_texts = jobs_df["Job Description"].tolist()
 cv_texts  = cvs_df["Resume_str"].tolist()
 
-model_path = "./models/tsdae_model3"
-baseline_model=tsdae_model = SentenceTransformer(model_path)
+model_paths = ["all-MiniLM-L6-v2", "./models/tsdae_model2", "./models/tsdae_model3"]
 
-job_emb = baseline_model.encode(
-    job_texts,
-    batch_size=64,              # good speed / memory tradeoff
-    convert_to_numpy=True,      # returns numpy array
-    show_progress_bar=True
-)
-
-cv_emb = baseline_model.encode(
-    cv_texts,
-    batch_size=64,
-    convert_to_numpy=True,
-    show_progress_bar=True
-)
-
-job_emb_t = torch.tensor(job_emb)
-cv_emb_t  = torch.tensor(cv_emb) # redenen voor dit is omdat semantic search werkt met tensors
-
-best_5 = util.semantic_search(job_emb_t, cv_emb_t, top_k=5)
-
-result = np.vstack([job_emb, cv_emb])
-
-evaluate_score1 = silhouette_scores(result)
-print("Silhouette Score:", evaluate_score1)
-
+# --- Loop over models ---
+for model_path in model_paths:
+    print(f"\nEvaluating model: {model_path}")
+    
+    model = SentenceTransformer(model_path)
+    
+    job_emb = model.encode(job_texts, batch_size=64, convert_to_numpy=True, show_progress_bar=True)
+    cv_emb  = model.encode(cv_texts, batch_size=64, convert_to_numpy=True, show_progress_bar=True)
+    
+    all_embeddings = np.vstack([job_emb, cv_emb])
+    
+    sil_score = silhouette_scores(all_embeddings)
+    db_score  = davis_bouldin_scores(all_embeddings)
+    ch_score  = calinski_harabasz_scores(all_embeddings)
+    
+    print("Silhouette Score:", sil_score)
+    print("Davies-Bouldin Score:", db_score)
+    print("Calinski-Harabasz Score:", ch_score)
