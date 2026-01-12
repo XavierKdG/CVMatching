@@ -1,186 +1,182 @@
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, util
 import torch
-from typing import List, Tuple
-from torch.utils.data import DataLoader
-from torch.utils.data import TensorDataset, DataLoader
-import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import Dataset
 import pandas as pd
-from utils import *
+from sklearn.model_selection import train_test_split
+import os
+from typing import List
 
-def collate_fn(batch):
-    noised_batch, original_batch = zip(*batch)  # unpack tuples
-    return list(noised_batch), list(original_batch)
-
-# Helper class om per index een (noised_sentence, original_sentence) paar te leveren
+# -----------------------------
+# Dataset
+# -----------------------------
 class TextPairsDataset(Dataset):
-    """
-    Custom PyTorch Dataset voor TSDAE-training.
-
-    Slaat noised en originele documenten op en geeft per index een tuple terug:
-    (noised_doc, original_doc).
-
-    Attributes:
-        noised_docs (List[str]): De documenten met ruis.
-        original_docs (List[str]): De originele documenten zonder ruis.
-    """
-    def __init__(self, noised_docs, original_docs):
+    """Custom Dataset voor TSDAE: (noised_doc, teacher_embedding)"""
+    def __init__(self, noised_docs: List[str], teacher_embeddings: torch.Tensor):
         self.noised_docs = noised_docs
-        self.original_docs = original_docs
+        self.teacher_embeddings = teacher_embeddings
 
     def __len__(self):
         return len(self.noised_docs)
 
     def __getitem__(self, idx):
-        return self.noised_docs[idx], self.original_docs[idx]
+        return self.noised_docs[idx], self.teacher_embeddings[idx]
 
-# het traint dus geen embeddings, maar een model dat beter embeddings kan genereren door zinnen beter te reconstrueren.
-# het doel van dit is om de sentence transformer model te trainen, de weights van het model worden getrained.
-# op basis van de toegevoegde ruis aan de originele documenten.
+# -----------------------------
+# TSDAE Trainer
+# -----------------------------
 class TSDAETrainer:
-    def __init__(self, model_name, batch_size, lr, epochs, save_dir="./models/tsdae_model"):
-        
-        # 1. Load encoder
-        self.encoder = SentenceTransformer(model_name) 
-        #load tokenizer from encoder
-        self.tokenizer = self.encoder.tokenizer  
-
-        # 2. Store hyperparameters
-        self.batch_size = batch_size
-        self.lr = lr
-        self.epochs = epochs
-        self.save_dir = save_dir
+    def __init__(self, model_name, batch_size=32, lr=1e-5, epochs=3, save_dir="./models/tsdae_model_fast"):
+        self.encoder = SentenceTransformer(model_name)
+        self.tokenizer = self.encoder.tokenizer
         self.teacher = SentenceTransformer(model_name)
         self.teacher.eval()
         for p in self.teacher.parameters():
             p.requires_grad = False
 
-        # 3. Device (GPU or CPU)
+        self.batch_size = batch_size
+        self.lr = lr
+        self.epochs = epochs
+        self.save_dir = save_dir
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.encoder.to(self.device)
+        self.teacher.to(self.device)
+        os.makedirs(self.save_dir, exist_ok=True)
 
-        # we maken hier een functie die ruis toevoegd aan de originele document, dus de originele dataset.
-    def add_noise(self, documents: list[str], noise_level: float = 0.1) -> list[str]:
-            """
-            TSDAE-style  noise toevoegen  aan document : masking + deletion + zin shuffle.
-            noise_level = Hoeveel van de tokens % gaat beinvloedt worden, dus hoe groot wordt de noise. (e.g., 0.1 = 10%).
-            """
-            noised_docs = []
-            mask_token : str = self.tokenizer.mask_token
+    # -----------------------------
+    # Add noise
+    # -----------------------------
+    def add_noise(self, documents: List[str], noise_level: float = 0.1) -> List[str]:
+        noised_docs = []
+        mask_token = self.tokenizer.mask_token
 
-            # split het document in tokens
-            for doc in documents:
+        for doc in documents:
+            tokens = doc.split()
+            n = len(tokens)
+            if n == 0:
+                noised_docs.append(doc)
+                continue
+
+            # Mask
+            n_mask = max(1, int(n * noise_level))
+            mask_indices = torch.randperm(n)[:n_mask].tolist()
+            for idx in mask_indices:
+                tokens[idx] = mask_token
+
+            # Delete
+            n_delete = max(1, int(n * noise_level))
+            delete_indices = set(torch.randperm(n)[:n_delete].tolist())
+            tokens = [tok for i, tok in enumerate(tokens) if i not in delete_indices]
+            if len(tokens) == 0:
                 tokens = doc.split()
-                n = len(tokens)
-                if n == 0:
-                    noised_docs.append(doc)
-                    continue
 
-                # Maskeren van de tokens berekend hoeveel % en daarna wordt het random gekozen indices vervangen door de mask token.
-                n_mask = max(1, int(n * noise_level))
-                mask_indices = torch.randperm(n)[:n_mask].tolist()
-                for idx in mask_indices:
-                    tokens[idx] = mask_token
+            # Local shuffle
+            window = 3
+            tokens_shuffled = tokens.copy()
+            for i in range(len(tokens_shuffled)):
+                start = max(0, i - window)
+                end = min(len(tokens_shuffled), i + window + 1)
+                j = int(torch.randint(start, end, (1,)).item())
+                tokens_shuffled[i], tokens_shuffled[j] = tokens_shuffled[j], tokens_shuffled[i]
 
-                # Verwijderen van de tokens uit de originele zinnen om ruis te gebven
-                n_delete = max(1, int(n * noise_level))
-                delete_indices = set(torch.randperm(n)[:n_delete].tolist())    
-                tokens_after_delete = [
-                    tok for i, tok in enumerate(tokens) if i not in delete_indices
-                ]
-                if len(tokens_after_delete) == 0:
-                    tokens_after_delete = tokens
+            noised_docs.append(" ".join(tokens_shuffled))
+        return noised_docs
 
-                # Zin shuffle bv zin is "de kat zit op de mat"
-                # na lokale shuffle kan het worden "de op zit kat de mat" dus het shuffled posities binnen een bepaalde window
-                window = 3  
-                tokens_shuffled: list[str] = tokens.copy()
-                for i in range(len(tokens_shuffled)):
-                    start = max(0, i - window)
-                    end = min(len(tokens_shuffled), i + window + 1)
+    # -----------------------------
+    # Train
+    # -----------------------------
+    def train(self, train_docs: List[str], val_docs: List[str], noise_level: float = 0.1):
+        # Precompute teacher embeddings
+        with torch.no_grad():
+            teacher_embeddings = self.teacher.encode(train_docs, batch_size=self.batch_size, convert_to_tensor=True, device=self.device)
 
-                    j:int = int(torch.randint(start, end, (1,)).item()) 
-                    tokens_shuffled[i], tokens_shuffled[j] = tokens_shuffled[j], tokens_shuffled[i]
-                    
-                noised_docs.append(" ".join(tokens_shuffled))
+        # Add noise
+        noised_docs = self.add_noise(train_docs, noise_level=noise_level)
 
-            print("ruis toegevoegd aan documenten.")
-            return noised_docs
-
-        # het trainen van het model met de originele documenten en toegevoegde ruis.
-    def train(self, original_docs: list[str], noise_level: float = 0.1):
-        """
-        Train TSDAE model using original documents + noisy versions.
-        No logging or printing.
-        """
-
-        # 1. Copy clean docs and create noised docs
-        clean_docs = original_docs.copy()
-        noised_docs = self.add_noise(clean_docs, noise_level)
-
-        # 2. Build dataset
-        dataset = TextPairsDataset(noised_docs=noised_docs, original_docs=clean_docs)
-        dataloader = DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=True
-        )
+        # Dataset & dataloader
+        dataset = TextPairsDataset(noised_docs, teacher_embeddings)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)
 
         optimizer = torch.optim.Adam(self.encoder.parameters(), lr=self.lr)
+        best_val_score = -1.0
 
-        # Teacher should *not* get gradients
-        for param in self.teacher.parameters():
-            param.requires_grad = False
-
-        # 3. Training loop
         for epoch in range(self.epochs):
-            for noised_batch, clean_batch in dataloader:
-
+            epoch_loss = 0.0
+            for noised_batch, teacher_emb_batch in dataloader:
                 optimizer.zero_grad()
 
-                # ---- Tokenize batches manually ----
+                # Tokenize student batch
                 noised_inputs = self.encoder.tokenize(noised_batch)
                 noised_inputs = {k: v.to(self.device) for k, v in noised_inputs.items()}
 
-                clean_inputs = self.encoder.tokenize(clean_batch)
-                clean_inputs = {k: v.to(self.device) for k, v in clean_inputs.items()}
-
-                # ---- Student forward pass (with grad) ----
+                # Forward pass (student)
                 student_out = self.encoder(noised_inputs)
-                recon_embeddings = student_out["sentence_embedding"]
+                student_embs = student_out["sentence_embedding"]
 
-                # ---- Teacher forward pass (no grad) ----
-                with torch.no_grad():
-                    teacher_out = self.teacher(clean_inputs)
-                    target_embeddings = teacher_out["sentence_embedding"]
+                # Teacher embeddings (already on device)
+                teacher_emb_batch = teacher_emb_batch.to(self.device)
 
-                # ---- Compute loss ----
-                loss = 1 - F.cosine_similarity(recon_embeddings, target_embeddings, dim=1).mean()
-
-                # ---- Backprop ----
+                # Loss
+                loss = 1 - F.cosine_similarity(student_embs, teacher_emb_batch, dim=1).mean()
                 loss.backward()
                 optimizer.step()
-                print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {loss.item():.4f}")
+                epoch_loss += loss.item()
 
-                # 4. Save model
-            self.encoder.save(self.save_dir)
-            print(f"Model succesvol opgeslagen op: {self.save_dir}")
+            avg_loss = epoch_loss / len(dataloader)
 
+            # Validation (batched)
+            val_score = self.evaluate(val_docs, noise_level=0.0)
+            print(f"Epoch [{epoch+1}/{self.epochs}], Train Loss: {avg_loss:.4f}, Val CosSim: {val_score:.4f}")
+
+            if val_score > best_val_score:
+                best_val_score = val_score
+                self.encoder.save(self.save_dir)
+                print(f"Model opgeslagen (beste val_score={best_val_score:.4f})")
+
+        print("Training compleet.")
+
+    # -----------------------------
+    # Evaluate
+    # -----------------------------
+    def evaluate(self, docs: List[str], noise_level: float = 0.0) -> float:
+        self.encoder.eval()
+        noised_docs = self.add_noise(docs, noise_level=noise_level)
+        cosine_sims = []
+
+        with torch.no_grad():
+            # Batched embeddings
+            student_embs = self.encoder.encode(noised_docs, batch_size=self.batch_size, convert_to_tensor=True, device=self.device)
+            teacher_embs = self.teacher.encode(docs, batch_size=self.batch_size, convert_to_tensor=True, device=self.device)
+
+            sims = F.cosine_similarity(student_embs, teacher_embs, dim=1)
+            cosine_sims = sims.cpu().tolist()
+
+        self.encoder.train()
+        return sum(cosine_sims) / len(cosine_sims)
+
+# -----------------------------
+# Main
+# -----------------------------
 if __name__ == "__main__":
-    setup_logging("tsdae_fine_tuning.log")
-
     dataset = pd.read_csv("./data/processed/job_descriptions2_cleaned.csv")
     original_docs = dataset['Job Description'].tolist()
-    trainer = TSDAETrainer(model_name="all-MiniLM-L6-v2", batch_size=16, lr=1e-5, epochs=2, save_dir="./models/tsdae_model3")
-    trainer.train(original_docs, noise_level=0.3)
 
+    # Train/Val/Test split
+    train_docs, temp_docs = train_test_split(original_docs, test_size=0.3, random_state=42)
+    val_docs, test_docs = train_test_split(temp_docs, test_size=0.5, random_state=42)
 
+    print(f"Train: {len(train_docs)}, Val: {len(val_docs)}, Test: {len(test_docs)}")
 
+    # Trainer
+    trainer = TSDAETrainer(
+        model_name="all-MiniLM-L6-v2",
+        batch_size=64,
+        lr=1e-5,
+        epochs=5,
+        save_dir="./models/tsdae_model_full"
+    )
 
+    trainer.train(train_docs, val_docs, noise_level=0.15)
 
-
-
-
+    test_score = trainer.evaluate(test_docs, noise_level=0.0)
+    print(f"Test Cosine Similarity: {test_score:.4f}")
