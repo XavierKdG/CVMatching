@@ -10,6 +10,7 @@ This script:
 USAGE EXAMPLE
 ====================
 
+In PowerShell:
 python cvmatching_pipeline.py \
     --jobs data/job_descriptions2.csv \
     --resumes data/Resume.csv \
