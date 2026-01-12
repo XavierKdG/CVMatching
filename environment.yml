@@ -25,5 +25,6 @@ dependencies:
   - pyyaml
   - PyPDF2
   - peft
+  - lxml
   - pip:
     - doccano
