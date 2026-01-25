@@ -1,6 +1,5 @@
-## CV ↔ Job Matching Project (Work In Progress - WIP)
+## CV-Matching Project
 
-Deze repository bevat een prototype voor het matchen van CV's met vacatures via semantische embeddings en fine-tuning.
 
 ### Clone Repository
 ```bash
@@ -39,7 +38,17 @@ conda activate cvmatching
   - `preprocess.py`: scripts voor het voorbereiden van CV- en vacaturedata
   - `finetune.py`: scripts voor het trainen van TSDAE of andere embeddings
   - `evaluate.py`: scripts voor het evalueren van de modellen op mutual ranking, hubness, perturbation en andere metrics
-- **data/**: bevat de raw en processed datasets
+- `data`: bevat de raw en processed datasets
+- `results`: bevat de resultaten van de vergelijking van de modellen in json formaat
+- `models`: bevat de modellen die getrained zijn en worden opgeslagen.
+
+Om het project correct uit te voeren, volg deze volgorde:
+```bash
+1. preprocess -> 2. tsdae_fine_tuning -> 3. evaluate
+```
 
 ### Usage
 Na setup kun je de scripts uit `src/` uitvoeren om data te preprocessen, modellen te trainen en te evalueren. De notebooks bieden aanvullende uitleg en visualisaties van resultaten en keuzes.
+
+
+
