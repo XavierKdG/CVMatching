@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 
 # evalueert voor elke jobs hoe goed hij past voor elke cv en wederzijds hetzelfde. job<> cv,cv <>job
-def evaluate_mutual_ranking(job_emb: list, cv_emb:list) -> dict:
+def evaluate_mutual_ranking(job_emb , cv_emb) -> dict:
     cv_to_job = util.cos_sim(cv_emb, job_emb).cpu().numpy()
     job_to_cv = util.cos_sim(job_emb, cv_emb).cpu().numpy()
 
@@ -25,7 +25,7 @@ def evaluate_mutual_ranking(job_emb: list, cv_emb:list) -> dict:
     }
 
 # kijkt naar als we een woord weghalen hoe robuust en consistent het model blijft in zijn matching grote verschil = slecht.
-def perturbation_test(model, cv_texts, job_emb, remove_word=None) -> float:
+def perturbation_test(model: SentenceTransformer, cv_texts: list, job_emb, remove_word=None) -> float:
     if remove_word is None:
         remove_word = ["Python"]
 
@@ -57,7 +57,7 @@ def evaluate_hubness(job_emb, cv_emb, top_k=5) -> dict:
         "hubness_std": float(np.std(counts)),
     }
 
-def evaluate_models(model_paths, job_texts, cv_texts, perturb_word=None, batch_size=64, top_k_hub=5) -> dict:
+def evaluate_models(model_paths: list, job_texts: list, cv_texts: list, perturb_word=None, batch_size=64, top_k_hub=5) -> dict:
     """
     Evalueer meerdere modellen op:
     - Mutual ranking
@@ -110,8 +110,7 @@ def evaluate_models(model_paths, job_texts, cv_texts, perturb_word=None, batch_s
 if __name__ == "__main__":
     model_paths = [
     "all-MiniLM-L6-v2",
-    "./models/tsdae_model_fast",
-    "./models/tsdae_model_full"
+    "./models/tsdae_model_last"
     ]
 
     jobs_df = pd.read_csv("./data/processed/job_descriptions2_cleaned.csv")

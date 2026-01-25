@@ -13,24 +13,24 @@ class Preprocessor:
         self.device = str(get_device(config))
         self.model = SentenceTransformer(model_name, device=self.device)
 
-    def remove_unnecessary_columns(self, df, columns_to_remove):
+    def remove_unnecessary_columns(self, df, columns_to_remove) -> pd.DataFrame:
         existing_cols = [col for col in columns_to_remove if col in df.columns]
         return df.drop(columns=existing_cols, errors='ignore')
-    
-    def remove_duplicates(self, df):
+
+    def remove_duplicates(self, df) -> pd.DataFrame:
         return df.drop_duplicates()
     
-    def remove_html_xml_tags(self, text):
+    def remove_html_xml_tags(self, text)-> str:
         if pd.isna(text):
             return text
         return re.sub(r'<[^>]+>', '', str(text))
     
-    def keep_alphanumeric_only(self, text):
+    def keep_alphanumeric_only(self, text:str)-> str:
         if pd.isna(text):
             return text
         return re.sub(r'[^a-zA-Z0-9\s]', ' ', str(text))
     
-    def remove_urls(self, text):
+    def remove_urls(self, text)-> str:
         if pd.isna(text):
             return text
         return re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+','', str(text))
