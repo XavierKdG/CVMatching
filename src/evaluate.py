@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import ndcg_score
 from tqdm import tqdm
-
+import json
 
 # evalueert voor elke jobs hoe goed hij past voor elke cv en wederzijds hetzelfde. job<> cv,cv <>job
 def evaluate_mutual_ranking(job_emb , cv_emb) -> dict:
@@ -130,6 +130,5 @@ if __name__ == "__main__":
         top_k_hub=5
     )
 
-    import json
-    with open("evaluation_results.json", "w") as f:
+    with open("../results/evaluation_results.json", "w") as f:
         json.dump(results, f, indent=4)

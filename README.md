@@ -48,7 +48,7 @@ Om het project correct uit te voeren, volg deze volgorde:
 ```
 
 ### Usage
-Na setup kun je de scripts uit `src/` uitvoeren om data te preprocessen, modellen te trainen en te evalueren. De notebooks bieden aanvullende uitleg en visualisaties van resultaten en keuzes.
+Na setup kun je de scripts uit `src/` uitvoeren om data te preprocessen, modellen te trainen en te evalueren. De notebooks bieden aanvullende uitleg vam resultaten en keuzes.
 
 
 
