@@ -5,6 +5,7 @@ from qdrant_client.http import models
 import logging
 import os
 import argparse
+import torch
 from sentence_transformers import SentenceTransformer
 from src.utils import setup_logging, load_config
 
@@ -85,7 +86,8 @@ def load_similarity_model(config):
     model_name = config["models"]["similarity_model"]
     logging.info(f"Loading similarity model: {model_name}")
     try:
-        model = SentenceTransformer(model_name)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = SentenceTransformer(model_name, device=device)
         logging.info("Similarity model loaded.")
         return model
     except Exception as e:
