@@ -1,18 +1,26 @@
 import numpy as np
 import re
+import torch
 from sentence_transformers import SentenceTransformer
+
+try:
+    torch.cuda.init()
+except AssertionError:
+    pass
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 class ResumeEvaluator:
     """Handles all logic for comparing and scoring a resume against a job description."""
-    def __init__(self, config):
+    def __init__(self, config, model_name=None):
         """
         Initializes the evaluator with configuration and loads the similarity model.
         
         Args:
             config (dict): The entire loaded config.yml file.
+            model_name (str, optional): Override the similarity model from config.
         """
-        model_name = config["models"]["similarity_model"]
-        self.sim_model = SentenceTransformer(model_name)
+        model_name = model_name or config["models"]["similarity_model"]
+        self.sim_model = SentenceTransformer(model_name, device=DEVICE)
 
         eval_config = config["evaluation"]
         self.semantic_weight = eval_config["weights"]["semantic"]
@@ -66,27 +74,11 @@ class ResumeEvaluator:
         
         return overlap_score, required_skills, intersection
 
-    def evaluate_match(self, resume_text, jd_text):
-        """
-        Performs a full evaluation of a single resume against a single job description.
-        
-        Args:
-            resume_text (str): The cleaned text of the resume.
-            jd_text (str): The cleaned text of the job description.
-            
-        Returns:
-            dict: A dictionary containing all score components.
-        """
-
-        resume_vec = self.sim_model.encode(resume_text)
-        jd_vec = self.sim_model.encode(jd_text)
+    def _score_from_vectors(self, resume_vec, jd_vec, resume_text, jd_text):
         semantic_score = self._get_cosine_similarity(resume_vec, jd_vec)
-        semantic_score_normalized = (semantic_score + 1) / 2 #normalize
-
+        semantic_score_normalized = (semantic_score + 1) / 2
         keyword_score, required, overlap = self._calculate_keyword_overlap(resume_text, jd_text)
-
         final_score = (semantic_score_normalized * self.semantic_weight) + (keyword_score * self.keyword_weight)
-        
         return {
             "total_score": final_score,
             "semantic_score": semantic_score_normalized,
@@ -94,3 +86,17 @@ class ResumeEvaluator:
             "required_skills": required,
             "overlapping_skills": overlap
         }
+
+    def evaluate_match(self, resume_text, jd_text):
+        resume_vec = self.sim_model.encode(resume_text)
+        jd_vec = self.sim_model.encode(jd_text)
+        return self._score_from_vectors(resume_vec, jd_vec, resume_text, jd_text)
+
+    def evaluate_batch(self, resume_texts, jd_text):
+        """Evaluates multiple resumes against one JD using batched GPU encoding."""
+        jd_vec = self.sim_model.encode(jd_text)
+        resume_vecs = self.sim_model.encode(resume_texts)
+        return [
+            self._score_from_vectors(resume_vecs[i], jd_vec, resume_texts[i], jd_text)
+            for i in range(len(resume_texts))
+        ]
