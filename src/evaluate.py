@@ -23,10 +23,20 @@ class ResumeEvaluator:
         self.sim_model = SentenceTransformer(model_name, device=DEVICE)
 
         eval_config = config["evaluation"]
-        self.semantic_weight = eval_config["weights"]["semantic"]
-        self.keyword_weight = eval_config["weights"]["keyword"]
+        self._original_semantic_weight = eval_config["weights"]["semantic"]
+        self._original_keyword_weight = eval_config["weights"]["keyword"]
+        self.semantic_weight = self._original_semantic_weight
+        self.keyword_weight = self._original_keyword_weight
         self.hard_skill_keywords = list(set(eval_config["hard_skill_keywords"]))
         self.standalone_skills = set(eval_config["standalone_regex_skills"])
+
+    def set_keyword_enabled(self, enabled):
+        if enabled:
+            self.semantic_weight = self._original_semantic_weight
+            self.keyword_weight = self._original_keyword_weight
+        else:
+            self.semantic_weight = 1.0
+            self.keyword_weight = 0.0
 
     def _get_cosine_similarity(self, vec1, vec2):
         """Calculates cosine similarity (score from -1 to 1)."""
