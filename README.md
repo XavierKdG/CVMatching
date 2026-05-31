@@ -4,8 +4,10 @@ Project Semester 5 - Groep **Weekend**
 ## About The Project
 CVMatching is a project where we use NLP to automatically analyze and match resumes with job descriptions. This repository contains the full pipeline, from data preprocessing and model training to a vector database and an interactive Streamlit application.
 
-The project consists of three main services managed by Docker:
-- **Streamlit App**: The interactive web interface for ranking resumes.
+> **System requirements:** The app requires approximately **1.8 GB of VRAM** (GPU memory) to run all embedding models. On systems without a compatible GPU, the app will fall back to CPU (slower).
+
+The project consists of two Docker services and a local Streamlit app:
+- **Streamlit App**: The interactive web interface for ranking resumes. Supports single-model evaluation with full score breakdowns and a **Compare all models** mode that runs 6 embedding models side by side with color-coded scores.
 
 - **Qdrant Database**: The vector database that stores and searches job/resume embeddings.
 
@@ -23,12 +25,13 @@ The project consists of three main services managed by Docker:
 
 ## Recommended Setup (Docker-Compose)
 
-This is the easiest and most reliable way to run the entire project. It will build the app and launch all three services (Streamlit, Qdrant, Doccano) at once.
+This will start Qdrant (vector database) and Doccano (annotation tool) via Docker. The Streamlit app runs on your host machine for faster iteration and GPU support.
 
 ### Prerequisites
 
 - [Git](https://git-scm.com/install/)
 - [Docker](https://docs.docker.com/get-started/get-docker/) (Docker Desktop is recommended as it includes `docker-compose`).
+- [Miniconda](https://docs.anaconda.com/miniconda/) (for the local Python environment)
 
 ### 1. Clone Repository
 ```bash
@@ -43,27 +46,36 @@ download the datasets below and place the it in the `data/raw/` directory
 
 - [job_descriptions2.csv](https://www.kaggle.com/datasets/014ce6313a60bf1563ff9ef3d57879bd8e7c1e1be0e8926bffb82d51ee85fda8?select=job_descriptions2.csv)
 
-### 3. Build and Run All Services
-This command will build your custom Streamlit app image and start all three services. This may take several minutes on the first run.
+### 3. Start Infrastructure (Qdrant + Doccano)
+This starts only the vector database and annotation tool:
 
 ```bash
-docker-compose up --build -d
+docker-compose up -d qdrant doccano
 ```
 
-*(Note: The configs/config.yml is already pre-configured to work with this Docker setup. The app will connect to http://localhost:6333.)*
+*(To also launch the Streamlit app inside Docker, run `docker-compose up --build -d` instead — takes ~6 min to build.)*
 
-### 4. Run the Data Pipeline (One-Time Setup)
-The Qdrant database is initially **empty**. To process your data and populate the database, you need to run the data pipeline directly from the root of the project.
+*(Note: The configs/config.yml is pre-configured to work with this Docker setup.)*
 
-1. Open your terminal and ensure you are in the project root directory.
-2. Make sure your Python environment is activated (`conda activate cvmatching`). 
-3. Run the full pipeline:
+### 4. Install Conda Environment & Run Pipeline
+
 ```bash
+conda env create -f environment.yml
+conda activate cvmatching
 python pipeline.py
 ```
-This will run `preprocess.py`, `train.py`, and `upload_to_qdrant.py`, populating your Qdrant database.
 
-### 5. Access Your Services
+This runs `preprocess.py`, `train.py`, and `upload_to_qdrant.py`, populating your Qdrant database with embeddings.
+
+### 5. Launch the Streamlit App
+
+```bash
+streamlit run app.py
+```
+
+Your Streamlit app will be at `http://localhost:8501`.
+
+### 6. Access Your Services
 
 - Streamlit App: `http://localhost:8501`
 
@@ -73,11 +85,19 @@ This will run `preprocess.py`, `train.py`, and `upload_to_qdrant.py`, populating
 
 ### Stopping the Services
 
-Since the services are running in the background, you can stop and remove them by running the following command from the project directory:
-
 ```bash
 docker-compose down
 ```
+
+### GPU Support (Windows)
+
+To use your NVIDIA GPU inside the Streamlit app:
+
+1. Switch Docker Desktop to **WSL2 backend** (Settings → General → "Use WSL 2 based engine").
+2. Install the [NVIDIA Driver for WSL](https://www.nvidia.com/en-us/drivers/) on Windows.
+3. In your WSL2 distro, run `sudo apt install nvidia-container-toolkit`.
+4. Verify with: `docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi`
+5. The app auto-detects CUDA — you'll see a **GPU** indicator at the top of the page.
 
 ## Manual Setup (Local Development)
 Follow these steps if you want to run the project locally without using docker-compose for the Streamlit app.
@@ -119,7 +139,15 @@ conda env create -f environment.yml
 conda activate cvmatching
 ```
 
-### 4. Run Qdrant Database (via Docker)
+### 4. Install CUDA PyTorch (Optional)
+
+If you have an NVIDIA GPU, install CUDA-enabled PyTorch for faster evaluation:
+
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+```
+
+### 5. Run Qdrant Database (via Docker)
 
 This still uses Docker, but only for the database.
 
@@ -129,7 +157,7 @@ docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
 
 Your Qdrant UI will be at `http://localhost:6333/dashboard`.
 
-### 5. Configure for Localhost
+### 6. Configure for Localhost
 
 For this manual setup, you must change the config file.
 
@@ -142,14 +170,14 @@ qdrant:
   url: "http://localhost:6333" # <-- Use localhost for this setup
 ```
 
-### 6. Run the Data Pipeline
+### 7. Run the Data Pipeline
 In your terminal (with the cvmatching env active), run the full pipeline to populate Qdrant:
 
 ```bash
 python pipeline.py
 ```
 
-### 7. Run the Streamlit App
+### 8. Run the Streamlit App
 
 Finally, launch the app:
 ```bash
@@ -180,7 +208,7 @@ python -m src.train --config configs/config1.yml
 ## Project Structure
 ```
 .
-├── app.py              # The Streamlit UI script
+├── app.py              # The Streamlit UI script (supports single & compare-all-models modes)
 ├── configs/            # All configuration files
 │   ├── config.yml
 │   ├── config1.yml
