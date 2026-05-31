@@ -47,19 +47,17 @@ download the datasets below and place the it in the `data/raw/` directory
 This command will build your custom Streamlit app image and start all three services. This may take several minutes on the first run.
 
 ```bash
-docker-compose up --build
+docker-compose up --build -d
 ```
 
-*(Note: The configs/config.yml is already pre-configured to work with this Docker setup. The app will connect to http://qdrant:6333.)*
+*(Note: The configs/config.yml is already pre-configured to work with this Docker setup. The app will connect to http://localhost:6333.)*
 
 ### 4. Run the Data Pipeline (One-Time Setup)
-Your app is running, but the Qdrant database is **empty**. You must run your Python pipeline inside the app container to process your data and fill the database.
+The Qdrant database is initially **empty**. To process your data and populate the database, you need to run the data pipeline directly from the root of the project.
 
-1. Open a **new, separate terminal** (leave `docker-compose up` running).
-
-2. Execute a shell inside the running `app` container:
-
-3. You are now inside the container. Run your full pipeline:
+1. Open your terminal and ensure you are in the project root directory.
+2. Make sure your Python environment is activated (`conda activate cvmatching`). 
+3. Run the full pipeline:
 ```bash
 python pipeline.py
 ```
@@ -71,11 +69,11 @@ This will run `preprocess.py`, `train.py`, and `upload_to_qdrant.py`, populating
 
 - Doccano UI: `http://localhost:8000` (Login: `admin` / `password`)
 
-- Qdrant Web UI: `http://localhost:6334`
+- Qdrant Web UI: `http://localhost:6333/dashboard`
 
 ### Stopping the Services
 
-To stop all services, press `Ctrl+C` in the terminal where `docker-compose up` is running, or run this command from the project directory in another terminal:
+Since the services are running in the background, you can stop and remove them by running the following command from the project directory:
 
 ```bash
 docker-compose down
@@ -129,7 +127,7 @@ This still uses Docker, but only for the database.
 docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
 ```
 
-Your Qdrant UI will be at `http://localhost:6334`.
+Your Qdrant UI will be at `http://localhost:6333/dashboard`.
 
 ### 5. Configure for Localhost
 
