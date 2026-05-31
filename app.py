@@ -77,7 +77,7 @@ def render_entry_list(entries, label_key, remove_prefix):
             with st.expander(entry["label"]):
                 st.text_area("", value=entry["text"], height=150, disabled=True, label_visibility="collapsed", key=f"text_{remove_prefix}_{i}")
         with col2:
-            if st.button("Remove", key=f"{remove_prefix}_{i}", use_container_width=True):
+            if st.button("Remove", key=f"{remove_prefix}_{i}", width='stretch'):
                 st.session_state[label_key].pop(i)
                 st.rerun()
 
@@ -114,7 +114,7 @@ def main():
 
             if jd_method == "Upload file":
                 jd_files = st.file_uploader("Upload job descriptions (PDF / TXT)", type=["pdf", "txt"], accept_multiple_files=True, key=f"jd_upload_{st.session_state.jd_upload_key}")
-                if st.button("Add", key="add_jd_file", use_container_width=True) and jd_files:
+                if st.button("Add", key="add_jd_file", width='stretch') and jd_files:
                     for jd_file in jd_files:
                         text = extract_file_text(jd_file)
                         if text:
@@ -124,7 +124,7 @@ def main():
             else:
                 with st.form(key="jd_paste_form", clear_on_submit=True):
                     jd_text = st.text_area("Paste job description text", height=150, label_visibility="collapsed")
-                    if st.form_submit_button("Add", use_container_width=True) and jd_text.strip():
+                    if st.form_submit_button("Add", width='stretch') and jd_text.strip():
                         label = entry_label(jd_text, "JD", len(st.session_state.jd_entries))
                         st.session_state.jd_entries.append({"label": label, "text": jd_text})
                         st.rerun()
@@ -143,7 +143,7 @@ def main():
 
             if resume_method == "Upload file":
                 resume_files = st.file_uploader("Upload resumes (PDF / TXT)", type=["pdf", "txt"], accept_multiple_files=True, key=f"resume_upload_{st.session_state.resume_upload_key}")
-                if st.button("Add", key="add_resume_file", use_container_width=True) and resume_files:
+                if st.button("Add", key="add_resume_file", width='stretch') and resume_files:
                     for resume_file in resume_files:
                         text = extract_file_text(resume_file)
                         if text:
@@ -153,7 +153,7 @@ def main():
             else:
                 with st.form(key="resume_paste_form", clear_on_submit=True):
                     resume_text = st.text_area("Paste resume text", height=150, label_visibility="collapsed")
-                    if st.form_submit_button("Add", use_container_width=True) and resume_text.strip():
+                    if st.form_submit_button("Add", width='stretch') and resume_text.strip():
                         label = entry_label(resume_text, "Resume", len(st.session_state.resume_entries))
                         st.session_state.resume_entries.append({"label": label, "text": resume_text})
                         st.rerun()
@@ -172,8 +172,11 @@ def main():
     resumes = st.session_state.resume_entries
 
     if jds and resumes:
+        keyword_enabled = st.checkbox("Enable keyword matching (60/40 split)", value=False, help="When disabled, ranking is 100% based on semantic similarity.")
         compare_mode = st.checkbox("Compare all models", value=False, help="Run evaluation against every similarity model and compare scores side by side")
-        if st.button("Rank Resumes", type="primary", use_container_width=True):
+        if st.button("Rank Resumes", type="primary", width='stretch'):
+            sem_weight = 1.0 if not keyword_enabled else 0.6
+            kw_weight = 0.0 if not keyword_enabled else 0.4
             if compare_mode:
                 models_to_run = SIMILARITY_MODELS
                 with st.spinner(f"Matching {len(resumes)} resume(s) against {len(jds)} JD(s) using {len(models_to_run)} models..."):
@@ -184,6 +187,7 @@ def main():
                             m_evaluator = load_evaluator(config, model_name)
                             if not m_evaluator:
                                 continue
+                            m_evaluator.set_keyword_enabled(keyword_enabled)
                             resume_texts = [clean_text(r["text"]) for r in resumes]
                             batch_data = m_evaluator.evaluate_batch(resume_texts, jd_text)
                             all_results[model_name] = {
@@ -213,11 +217,12 @@ def main():
                                 subset=score_cols,
                                 vmin=0, vmax=100
                             )
-                            st.dataframe(styled, use_container_width=True, hide_index=True)
+                            st.dataframe(styled, width='stretch', hide_index=True)
             else:
                 evaluator = load_evaluator(config, model_name)
                 if not evaluator:
                     st.stop()
+                evaluator.set_keyword_enabled(keyword_enabled)
                 with st.spinner(f"Matching {len(resumes)} resume(s) against {len(jds)} job description(s)..."):
                     for jd_entry in jds:
                         jd_text = clean_text(jd_entry["text"])
@@ -253,8 +258,8 @@ def main():
                                         col2.metric(label="Total Match", value=f"{r['score']*100:.1f}%")
                                         with st.expander("Score Breakdown & Keyword Analysis"):
                                             c1, c2 = st.columns(2)
-                                            c1.metric(label="Semantic Match (60%)", value=f"{r['semantic']*100:.1f}%")
-                                            c2.metric(label="Keyword Match (40%)", value=f"{r['keyword']*100:.1f}%")
+                                            c1.metric(label=f"Semantic Match ({int(sem_weight*100)}%)", value=f"{r['semantic']*100:.1f}%")
+                                            c2.metric(label=f"Keyword Match ({int(kw_weight*100)}%)", value=f"{r['keyword']*100:.1f}%")
                                             st.markdown(f"**Required keywords:** `{len(r['required'])}`")
                                             st.write(r["required"] if r["required"] else "None")
                                             st.markdown(f"**Found in resume:** `{len(r['overlap'])}`")
