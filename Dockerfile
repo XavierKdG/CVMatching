@@ -21,12 +21,20 @@ SHELL ["/bin/bash", "-c"]
 # This is the correct way to "activate" the env for Docker
 ENV PATH /opt/conda/envs/cvmatching/bin:$PATH
 
-# 8. Copy the rest of your project code into the app directory
+# 8. Replace CPU-only PyTorch with CUDA-enabled version
+# The conda env has CPU-only PyTorch; we need CUDA for Blackwell (RTX 5060)
+RUN pip install --force-reinstall torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+# 9. Reinstall sentence-transformers (without touching its deps) 
+# so it registers the CUDA torch instead of the CPU one
+RUN pip install --force-reinstall --no-deps sentence-transformers==5.5.1
+
+# 10. Copy the rest of your project code into the app directory
 COPY . .
 
-# 9. Expose the default Streamlit port
+# 11. Expose the default Streamlit port
 EXPOSE 8501
 
-# 10. The command to run when the container starts
+# 12. The command to run when the container starts
 # This runs `streamlit run app.py` from within the activated env
 CMD ["streamlit", "run", "app.py"]

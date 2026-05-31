@@ -15,6 +15,11 @@ services:
       - qdrant  # Wait for qdrant to be "up" before starting
     # This ensures your app can find the 'src' module
     working_dir: /app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
 
   # Service 2: Qdrant Vector Database
   qdrant:
