@@ -6,6 +6,8 @@ channels:
 
 dependencies:
   - python=3.12
+  - setuptools
+  - wheel
   - pandas
   - numpy
   - scikit-learn
@@ -24,5 +26,4 @@ dependencies:
   - gensim=4.3.3
   - pyyaml
   - PyPDF2
-  - pip:
-    - doccano
+    
